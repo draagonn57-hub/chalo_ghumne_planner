@@ -1,0 +1,27 @@
+# Node modules
+frontend/node_modules/
+backend/__pycache__/
+backend/.pytest_cache/
+
+# Environment files
+frontend/.env
+backend/.env
+
+# Python virtual environment
+venv/
+.env
+
+# Logs
+*.log
+
+# Build folders
+frontend/build/
+frontend/dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VS Code
+.vscode/memory/
+*.zip
