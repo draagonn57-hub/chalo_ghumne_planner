@@ -14,16 +14,16 @@ const SUGGESTION_STEPS = [
 
 const STEPS = [
   {
-    key: "budget_diet",
-    title: "How lavish — and what's on the menu?",
-    sub: "Set the spending tone and food philosophy.",
-    type: "combined",
-  },
-  {
     key: "duration_days",
     title: "How many days?",
     sub: "Slide to your trip length.",
     type: "range",
+  },
+  {
+    key: "budget_diet",
+    title: "How lavish — and what's on the menu?",
+    sub: "Set the spending tone and food philosophy.",
+    type: "combined",
   },
   {
     key: "interests",
@@ -53,10 +53,42 @@ const STEPS = [
   },
 ];
 
+/**
+ * Returns per-person approximate budget ranges based on number of days.
+ * Scales linearly from a base (2-day) rate.
+ *
+ * Tier breakpoints (per person):
+ *   Backpacker : ~2,000–4,000 ₹/day  → range shown: (days × 2k) to (days × 4k), min 7k–10k
+ *   Moderate   : ~4,500–9,000 ₹/day  → range shown: (days × 4.5k) to (days × 9k), min 22k–25k
+ *   Luxury     : ~10,000+ ₹/day      → shown as (days × 10k)+ 
+ */
+function getBudgetEstimates(days) {
+  const d = Math.max(2, days || 5);
+  // Per user spec:
+  //   3 days → backpacker 7–22k, moderate 22–55k, luxury 55k+
+  //   5 days → backpacker 10–25k, moderate 25–60k, luxury 60k+
+  const backpackerLow  = Math.round(Math.max(7000,  d * 2000)  / 1000) * 1000;
+  const backpackerHigh = Math.round(Math.max(22000, d * 5000)  / 1000) * 1000;
+  const moderateLow    = Math.round(Math.max(22000, d * 5000)  / 1000) * 1000;
+  const moderateHigh   = Math.round(Math.max(55000, d * 12000) / 1000) * 1000;
+  const luxuryLow      = Math.round(Math.max(55000, d * 12000) / 1000) * 1000;
+
+  const fmt = (n) =>
+    n >= 100000
+      ? `₹${(n / 100000).toFixed(1).replace(/\.0$/, "")} L`
+      : `₹${(n / 1000).toFixed(0)}k`;
+
+  return {
+    budget:      `${fmt(backpackerLow)} – ${fmt(backpackerHigh)} / person`,
+    "mid-range": `${fmt(moderateLow)} – ${fmt(moderateHigh)} / person`,
+    luxury:      `${fmt(luxuryLow)}+ / person`,
+  };
+}
+
 const BUDGET_OPTIONS = [
-  { v: "budget", label: "Backpacker", desc: "Hostels & street food", icon: Wallet },
-  { v: "mid-range", label: "Balanced", desc: "Comfort & experiences", icon: Wallet },
-  { v: "luxury", label: "Luxury", desc: "Boutique stays & fine dining", icon: Wallet },
+  { v: "budget",    label: "Backpacker", desc: "Hostels & street food",       icon: Wallet },
+  { v: "mid-range", label: "Balanced",   desc: "Comfort & experiences",        icon: Wallet },
+  { v: "luxury",    label: "Luxury",     desc: "Boutique stays & fine dining", icon: Wallet },
 ];
 
 const DIET_OPTIONS = [
@@ -152,8 +184,8 @@ export default function Questionnaire() {
           ))}
         </div>
         <div className="mt-2 flex justify-between text-xs text-slate-400">
-          <span>Budget</span>
           <span>Duration</span>
+          <span>Budget</span>
           <span>Interests</span>
           <span>Crew</span>
           <span>Review</span>
@@ -247,17 +279,23 @@ export default function Questionnaire() {
                       <div className="w-8 h-8 rounded-full bg-[#E76F51]/10 text-[#E76F51] flex items-center justify-center text-sm font-bold">1</div>
                       <h3 className="font-display text-2xl">Spending style</h3>
                     </div>
-                    <div className="grid gap-4 sm:grid-cols-3">
-                      {BUDGET_OPTIONS.map((option) => (
-                        <Choice
-                          key={option.v}
-                          option={option}
-                          selected={state.budget === option.v}
-                          onClick={() => setState({ ...state, budget: option.v })}
-                          testId={`choice-budget-${option.v}`}
-                        />
-                      ))}
-                    </div>
+                    {(() => {
+                      const estimates = getBudgetEstimates(state.duration_days);
+                      return (
+                        <div className="grid gap-4 sm:grid-cols-3">
+                          {BUDGET_OPTIONS.map((option) => (
+                            <BudgetChoice
+                              key={option.v}
+                              option={option}
+                              estimate={estimates[option.v]}
+                              selected={state.budget === option.v}
+                              onClick={() => setState({ ...state, budget: option.v })}
+                              testId={`choice-budget-${option.v}`}
+                            />
+                          ))}
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="h-px bg-slate-100" />
                   <div>
@@ -403,6 +441,54 @@ function Choice({ option, selected, onClick, testId, multi }) {
       <div className="font-display text-2xl mt-4">{option.label}</div>
       {option.desc && <div className="text-slate-500 text-sm mt-1">{option.desc}</div>}
       {multi && <div className="text-xs text-slate-400 mt-2">Pick any</div>}
+    </motion.button>
+  );
+}
+
+/**
+ * Budget card variant — shows the spending-style label, subtitle,
+ * and a dynamic approximate cost estimate for the selected duration.
+ */
+function BudgetChoice({ option, estimate, selected, onClick, testId }) {
+  const Icon = option.icon;
+  return (
+    <motion.button
+      whileHover={{ y: -2 }}
+      whileTap={{ scale: 0.98 }}
+      onClick={onClick}
+      className={`choice-card text-left relative ${selected ? "selected" : ""}`}
+      data-testid={testId}
+    >
+      {selected && (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 400, damping: 15 }}
+          className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#E76F51] text-white flex items-center justify-center"
+        >
+          <Check size={12} strokeWidth={3} />
+        </motion.div>
+      )}
+      <div
+        className={`w-12 h-12 rounded-full flex items-center justify-center transition-colors ${
+          selected ? "bg-[#E76F51] text-white" : "bg-[#0D5C75]/10 text-[#0D5C75]"
+        }`}
+      >
+        <Icon size={22} />
+      </div>
+      <div className="font-display text-2xl mt-4">{option.label}</div>
+      <div className="text-slate-500 text-sm mt-1">{option.desc}</div>
+      {estimate && (
+        <div
+          className={`mt-3 text-xs font-semibold px-2 py-1 rounded-lg inline-block transition-colors ${
+            selected
+              ? "bg-[#E76F51]/15 text-[#E76F51]"
+              : "bg-slate-100 text-slate-500"
+          }`}
+        >
+          ~{estimate}
+        </div>
+      )}
     </motion.button>
   );
 }

@@ -203,6 +203,11 @@ CORE ITINERARY RULES
 - Use the selected destination as the primary destination.
 - NEVER replace the selected destination with another destination.
 - Respect the user's budget.
+- All hotels, food, activities, and transport must stay within the stated budget range per person.
+- For backpacker budget: choose hostels, guesthouses, dorms, street food, local dhabas, buses or shared transport.
+- For mid-range budget: choose 3-star hotels, casual restaurants, economy flights or AC trains.
+- For luxury budget: choose 4-5 star hotels, fine dining, business class flights or premium trains.
+- The estimated_total_cost must fall within the budget range specified in the preferences.
 - Respect the user's dietary preference.
 - Respect the user's transport preference.
 - Respect the user's interests.
@@ -616,11 +621,44 @@ def _preference_text(
     else:
         interests_text = str(interests)
 
+    budget = prefs.get("budget", "mid-range")
+    days = int(prefs.get("duration_days", 5) or 5)
+
+    # Build per-person budget range for the AI to enforce.
+    def _fmt(n: int) -> str:
+        if n >= 100_000:
+            return f"₹{n / 100_000:.1f}L".rstrip("0").rstrip(".")
+        return f"₹{n // 1000}k"
+
+    d = max(2, days)
+    if budget == "budget":
+        low  = max(7_000,  d * 2_000)
+        high = max(22_000, d * 5_000)
+        budget_range_hint = (
+            f"{_fmt(low)} – {_fmt(high)} per person (backpacker tier: "
+            f"hostels, street food, budget transport)"
+        )
+    elif budget == "luxury":
+        low = max(55_000, d * 12_000)
+        budget_range_hint = (
+            f"{_fmt(low)}+ per person (luxury tier: "
+            f"premium hotels, fine dining, business/first-class transport)"
+        )
+    else:  # mid-range / balanced
+        low  = max(22_000, d * 5_000)
+        high = max(55_000, d * 12_000)
+        budget_range_hint = (
+            f"{_fmt(low)} – {_fmt(high)} per person (moderate tier: "
+            f"3-star hotels, restaurant meals, economy transport)"
+        )
+
     return f"""
 Destination scope: The AI should decide automatically between domestic and international travel.
 Diet: {prefs.get("diet", "veg")}
-Budget: {prefs.get("budget", "mid-range")}
-Duration: {prefs.get("duration_days", 5)} days
+Budget tier: {budget}
+Approximate total budget (all-inclusive per person for {days} days): {budget_range_hint}
+IMPORTANT: All hotels, activities, food, and transport recommendations MUST stay within the above budget range. Do NOT recommend anything that would exceed this budget.
+Duration: {days} days
 Interests: {interests_text}
 Companions: {prefs.get("companions", "solo")}
 Transport: {prefs.get("transport", "flight")}
