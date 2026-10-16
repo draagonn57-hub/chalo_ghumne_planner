@@ -130,6 +130,7 @@ export default function Suggestions({ mode }) {
   return (
     <>
       <div className="max-w-6xl mx-auto px-6 py-10 sm:py-14">
+        <div className="tp-card p-8 sm:p-10">
         <motion.button
           initial={{ opacity: 0, x: -10 }}
           animate={{ opacity: 1, x: 0 }}
@@ -210,6 +211,7 @@ export default function Suggestions({ mode }) {
               </div>
             </motion.button>
           ))}
+        </div>
         </div>
       </div>
 

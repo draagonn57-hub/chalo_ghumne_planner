@@ -13,6 +13,7 @@ import { LangProvider } from "@/lib/LangContext";
 
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import DynamicBackground from "@/components/DynamicBackground";
 
 import Landing from "@/pages/Landing";
 import { Login, Signup, ForgotPassword, ResetPassword } from "@/pages/Auth";
@@ -67,12 +68,36 @@ function RequireAdmin({ children }) {
 }
 
 function Shell() {
-  return (
-    <>
-      <Navbar />
+  const location = useLocation();
+  const isLanding = location.pathname === "/";
+  // Auth pages manage their own gradient overlay on top of the global background
+  const isAuthPage = ["/login", "/signup", "/forgot", "/reset"].includes(location.pathname);
 
-      <main className="min-h-[calc(100vh-5rem)]">
-        <Routes>
+  return (
+    <div className="relative min-h-screen">
+      {/*
+        Global cycling background — only shown on non-Landing pages.
+        Landing has its own DynamicBackground inside the hero section.
+      */}
+      {!isLanding && (
+        <DynamicBackground
+          mode="cycle"
+          overlayClassName=""
+          className="fixed"
+        />
+      )}
+
+      {/* All content renders above the background */}
+      <div className="relative z-10 flex flex-col min-h-screen">
+        <Navbar />
+
+        {/*
+          - Landing: its own background inside the hero, solid white sections below — no global bg
+          - Auth pages: transparent so cycling bg shows, they apply their own dark gradient overlay
+          - All other pages: glassy overlay so cycling bg shows through frosted glass
+        */}
+        <main className="flex-1 min-h-[calc(100vh-5rem)]">
+          <Routes>
 
           {/* ==================== PUBLIC ==================== */}
 
@@ -262,10 +287,11 @@ function Shell() {
           />
 
         </Routes>
-      </main>
+        </main>
 
-      <Footer />
-    </>
+        <Footer />
+      </div>
+    </div>
   );
 }
 

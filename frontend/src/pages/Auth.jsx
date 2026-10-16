@@ -3,7 +3,6 @@ import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import DynamicBackground from "@/components/DynamicBackground";
 
 export function Login() {
   const { login } = useAuth();
@@ -152,11 +151,8 @@ function Field({ label, type = "text", value, onChange, testid }) {
 function AuthLayout({ title, subtitle, children }) {
   return (
     <div className="relative min-h-[calc(100vh-5rem)] overflow-hidden">
-      {/* Background */}
-      <DynamicBackground
-        mode="static"
-        overlayClassName="bg-gradient-to-br from-[#0D5C75]/70 via-[#0A1E28]/45 to-[#0A1E28]/70"
-      />
+      {/* Gradient overlay on top of the global cycling background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-[#0D5C75]/60 via-[#0A1E28]/40 to-[#0A1E28]/65 pointer-events-none" />
 
       <div className="relative z-10 min-h-[calc(100vh-5rem)] flex flex-col items-center justify-center px-6 py-16 sm:px-10">
         <div

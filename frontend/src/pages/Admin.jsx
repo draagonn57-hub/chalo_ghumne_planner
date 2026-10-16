@@ -7,6 +7,7 @@ export default function Admin() {
   const [tab, setTab] = useState("stats");
   return (
     <div className="max-w-7xl mx-auto px-6 py-12" data-testid="admin-page">
+      <div className="tp-card p-8 sm:p-10">
       <p className="eyebrow">Command center</p>
       <h1 className="font-display text-5xl mt-2 tracking-tight">Admin</h1>
 
@@ -27,6 +28,7 @@ export default function Admin() {
         {tab === "destinations" && <Dests />}
         {tab === "hotels" && <Hotels />}
         {tab === "feedback" && <Feedback />}
+      </div>
       </div>
     </div>
   );

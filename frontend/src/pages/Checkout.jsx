@@ -116,6 +116,7 @@ export default function Checkout() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-10 sm:py-14" data-testid="checkout-page">
+      <div className="tp-card p-8 sm:p-10">
       <button onClick={() => nav(-1)} className="btn-ghost flex items-center gap-2 mb-4">
         <ArrowLeft size={16} /> Back to booking
       </button>
@@ -279,6 +280,7 @@ export default function Checkout() {
           </motion.div>
         )}
       </AnimatePresence>
+      </div>{/* end tp-card */}
     </div>
   );
 }

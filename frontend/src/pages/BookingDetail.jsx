@@ -49,6 +49,7 @@ export default function BookingDetail() {
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-10 sm:py-14" data-testid="booking-detail">
+      <div className="tp-card p-8 sm:p-10">
       <button onClick={() => nav("/dashboard")} className="btn-ghost flex items-center gap-2 mb-4">
         <ArrowLeft size={16} /> Back to dashboard
       </button>
@@ -160,6 +161,7 @@ export default function BookingDetail() {
           Back to Dashboard
         </Link>
       </div>
+      </div>{/* end tp-card */}
     </div>
   );
 }

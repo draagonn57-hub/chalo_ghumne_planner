@@ -13,6 +13,7 @@ export default function Destinations() {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-12" data-testid="destinations-page">
+      <div className="tp-card p-8 sm:p-10">
       <p className="eyebrow">Curated by our travel editors</p>
       <h1 className="font-display text-5xl mt-2 tracking-tight">Destinations</h1>
 
@@ -45,6 +46,7 @@ export default function Destinations() {
             </div>
           </div>
         ))}
+      </div>
       </div>
     </div>
   );

@@ -87,6 +87,7 @@ export default function Dashboard() {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10 sm:py-14">
+      <div className="tp-card p-8 sm:p-10">
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -349,6 +350,7 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+      </div>{/* end tp-card */}
     </div>
   );
 }

@@ -59,6 +59,7 @@ export default function BookingConfirmation() {
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-10 sm:py-14" data-testid="booking-confirmation">
+      <div className="tp-card p-8 sm:p-10">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -164,6 +165,7 @@ export default function BookingConfirmation() {
           Back to Home
         </Link>
       </div>
+      </div>{/* end tp-card */}
     </div>
   );
 }

@@ -185,6 +185,7 @@ export default function Booking() {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-10 sm:py-14" data-testid="booking-page">
+      <div className="tp-card p-8 sm:p-10">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
         <button onClick={goBack} className="btn-ghost flex items-center gap-2 mb-4" data-testid="booking-back">
@@ -265,6 +266,7 @@ export default function Booking() {
             canCheckout={!!selectedFlight && !!selectedHotel}
           />
         </div>
+      </div>
       </div>
     </div>
   );

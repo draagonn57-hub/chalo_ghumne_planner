@@ -23,6 +23,7 @@ export default function Profile() {
   if (!user) return null;
   return (
     <div className="max-w-3xl mx-auto px-6 py-12" data-testid="profile-page">
+      <div className="tp-card p-8 sm:p-10">
       <p className="eyebrow">Your account</p>
       <h1 className="font-display text-5xl mt-2 tracking-tight">Profile</h1>
 
@@ -37,7 +38,7 @@ export default function Profile() {
         </div>
       </div>
 
-      <form onSubmit={save} className="tp-card p-8 mt-10 space-y-5" data-testid="profile-form">
+      <form onSubmit={save} className="mt-10 space-y-5" data-testid="profile-form">
         <label className="block">
           <span className="text-xs uppercase tracking-widest text-slate-500 font-semibold">Display name</span>
           <input value={name} onChange={(e) => setName(e.target.value)}
@@ -52,6 +53,7 @@ export default function Profile() {
         </label>
         <button className="btn-primary" disabled={busy} data-testid="profile-save">{busy ? "Saving…" : "Save changes"}</button>
       </form>
+      </div>
     </div>
   );
 }

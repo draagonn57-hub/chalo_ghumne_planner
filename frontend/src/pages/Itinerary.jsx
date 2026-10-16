@@ -463,6 +463,7 @@ function ItineraryView({
       data-testid="itinerary-view"
 >
       {/* Header */}
+      <div className="tp-card p-8 sm:p-10">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-3xl">
           <p className="eyebrow">Your journey</p>
@@ -572,6 +573,7 @@ function ItineraryView({
           )}
         </div>
       </div>
+      </div>{/* end header tp-card */}
       {/* Sticky section nav */}
       <div className="sticky top-20 z-30 mt-8 -mx-6 px-6 py-3 bg-[#FDFBF7]/90 backdrop-blur-md border-y border-slate-100">
         <div className="flex gap-1 overflow-x-auto hide-scrollbar">

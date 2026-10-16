@@ -171,6 +171,9 @@ export default function Questionnaire() {
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-10 sm:py-16" data-testid="wizard">
+      {/* Outer white card wrapping progress bar + all step content */}
+      <div className="tp-card p-8 sm:p-10">
+
       {/* Progress — segmented step dots */}
       <div className="mb-10">
         <div className="flex items-center justify-between text-sm">
@@ -216,7 +219,7 @@ export default function Questionnaire() {
 
             <div className="mt-10">
               {current.type === "range" ? (
-                <div className="tp-card p-8">
+                <div className="p-2">
                   <div className="flex items-baseline gap-3">
                     <motion.span
                       key={state.duration_days}
@@ -279,7 +282,7 @@ export default function Questionnaire() {
                   </label>
                 </div>
               ) : current.type === "combined" ? (
-                <div className="tp-card p-8 space-y-8">
+                <div className="space-y-8">
                   <div>
                     <div className="flex items-center gap-2 mb-5">
                       <div className="w-8 h-8 rounded-full bg-[#E76F51]/10 text-[#E76F51] flex items-center justify-center text-sm font-bold">1</div>
@@ -420,7 +423,7 @@ export default function Questionnaire() {
             <p className="text-slate-500 mt-3">
               We'll find four destinations that fit your travel style.
             </p>
-            <div className="tp-card p-8 mt-8 grid sm:grid-cols-2 gap-4 text-sm">
+            <div className="border border-slate-100 rounded-2xl p-6 mt-8 grid sm:grid-cols-2 gap-4 text-sm bg-slate-50/60">
               {[
                 ["Budget", state.budget],
                 ["Travel type", state.travel_type],
@@ -455,6 +458,8 @@ export default function Questionnaire() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      </div>{/* end outer tp-card */}
 
       {loading && (
         <AILoadingChecklist steps={SUGGESTION_STEPS} done={!busy} onDone={() => {}} />
