@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Utensils, UtensilsCrossed, Wallet, Sparkles, Users, Mountain, Music4, Landmark, Save as Waves, Leaf, ChefHat, ArrowLeft, ArrowRight, Check, Calendar, Globe, MapPin } from "lucide-react";
+import { Compass, Utensils, UtensilsCrossed, Wallet, Sparkles, Users, Mountain, Music4, Landmark, Save as Waves, Leaf, ChefHat, ArrowLeft, ArrowRight, Check, Calendar, Globe, MapPin } from "lucide-react";
 import AILoadingChecklist from "@/components/AILoadingChecklist";
 
 const SUGGESTION_STEPS = [
@@ -106,7 +106,14 @@ const DIET_LABELS = {
 const TRAVEL_TYPE_OPTIONS = [
   { v: "domestic", label: "Domestic", desc: "Travel within India", icon: MapPin },
   { v: "international", label: "International", desc: "Travel outside India", icon: Globe },
+  { v: "any", label: "Anywhere", desc: "Open to India & abroad", icon: Compass },
 ];
+
+const TRAVEL_TYPE_LABELS = {
+  domestic: "Domestic (Within India)",
+  international: "International (Outside India)",
+  any: "Anywhere (Domestic & International)",
+};
 
 const DEFAULTS = {
   diet: "",
@@ -320,7 +327,7 @@ export default function Questionnaire() {
                       <div className="w-8 h-8 rounded-full bg-[#E76F51]/10 text-[#E76F51] flex items-center justify-center text-sm font-bold">2</div>
                       <h3 className="font-display text-2xl">Travel type</h3>
                     </div>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-4 sm:grid-cols-3">
                       {TRAVEL_TYPE_OPTIONS.map((option) => (
                         <Choice
                           key={option.v}
@@ -434,7 +441,7 @@ export default function Questionnaire() {
             <div className="border border-slate-100 rounded-2xl p-6 mt-8 grid sm:grid-cols-2 gap-4 text-sm bg-slate-50/60">
               {[
                 ["Budget", state.budget],
-                ["Travel type", state.travel_type],
+                ["Travel type", TRAVEL_TYPE_LABELS[state.travel_type] || state.travel_type],
                 ["Duration", `${state.duration_days} days`],
                 ["Start date", state.start_date || "Not set"],
                 ["Companions", state.companions],

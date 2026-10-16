@@ -132,5 +132,18 @@ class TestExploreMoreDeduplication(unittest.TestCase):
         self.assertEqual(model.diet, "flexitarian")
 
 
+    def test_questionnaire_in_model_with_anywhere_travel_type(self):
+        data = {
+            "diet": "veg",
+            "budget": "budget",
+            "travel_type": "any",
+            "duration_days": 5,
+            "interests": ["Nature"],
+            "companions": "solo",
+        }
+        model = QuestionnaireIn(**data)
+        self.assertEqual(model.travel_type, "any")
+
+
 if __name__ == "__main__":
     unittest.main()

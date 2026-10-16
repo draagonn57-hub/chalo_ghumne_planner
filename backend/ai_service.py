@@ -65,7 +65,7 @@ Rules:
 - Prefer destinations that genuinely match the user's preferences.
 - IMPORTANT: If travel_type is "domestic", ALL four destinations MUST be within India.
 - IMPORTANT: If travel_type is "international", ALL four destinations MUST be outside India.
-- If travel_type is not specified, decide automatically whether each suggestion should be domestic or international.
+- If travel_type is "any", "both", or not specified, the traveler is open to both domestic and international destinations. Suggest a compelling, balanced mix of both domestic (within India) and international destinations tailored to their budget and interests.
 - Use the user's budget, duration, origin, interests, companions, diet, and transport to decide what is realistic.
 - Keep all four destinations distinct, varied, and genuinely relevant to the user.
 - If a list of previously suggested destinations is provided, DO NOT suggest any of those places or any spelling variations, aliases, or suburbs of them. Always recommend fresh, unvisited places that match the requested vibe.
@@ -659,7 +659,7 @@ def _preference_text(
     elif travel_type == "international":
         scope_text = "Destination scope: INTERNATIONAL ONLY — All destinations MUST be outside India. Do NOT suggest any Indian destinations."
     else:
-        scope_text = "Destination scope: The AI should decide automatically between domestic and international travel."
+        scope_text = "Destination scope: OPEN TO BOTH DOMESTIC & INTERNATIONAL — The traveler is flexible and undecided. Suggest a balanced mix of domestic (within India) and international destinations that best fit their budget, interests, and duration."
 
     diet_pref = prefs.get("diet", "veg")
     if diet_pref in ("flexitarian", "both", "all"):
