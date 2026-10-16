@@ -52,7 +52,7 @@ function getNumTravelers(companions) {
   }
 }
 
-function buildBreakdown(it) {
+function buildBreakdown(it, selectedHotelIndex = 0, selectedFlightIndex = 0) {
   const currency = detectCurrency(it.estimated_total_cost) || "₹";
   const durationDays = it.days?.length || 0;
   const prefs = it.preferences || {};
@@ -75,7 +75,10 @@ function buildBreakdown(it) {
     durationDays,
   };
 
-  (it.flights || []).forEach((f) => {
+  // Only count the selected flight (by index), not all flights
+  const allFlights = it.flights || [];
+  if (allFlights.length > 0) {
+    const f = allFlights[selectedFlightIndex] || allFlights[0];
     const amt = parseAmount(f.price);
     if (amt > 0) {
       data.flights += amt;
@@ -85,7 +88,7 @@ function buildBreakdown(it) {
         detail: `${f.duration || ""} ${f.stops || ""}`.trim(),
       });
     }
-  });
+  }
 
   (it.transport || []).forEach((t) => {
     const amt = parseAmount(t.price);
@@ -99,8 +102,11 @@ function buildBreakdown(it) {
     }
   });
 
+  // Only count the selected hotel (by index), not all hotels
   const nights = Math.max(1, durationDays - 1);
-  (it.hotels || []).forEach((h) => {
+  const allHotels = it.hotels || [];
+  if (allHotels.length > 0) {
+    const h = allHotels[selectedHotelIndex] || allHotels[0];
     const perNight = parseAmount(h.price_per_night);
     if (perNight > 0) {
       const total = perNight * nights;
@@ -111,7 +117,7 @@ function buildBreakdown(it) {
         detail: `${h.price_per_night}/night × ${nights} nights`,
       });
     }
-  });
+  }
 
   (it.days || []).forEach((day) => {
     if (!day.food) return;
@@ -312,8 +318,11 @@ function CategoryCard({ catKey, data, currency }) {
   );
 }
 
-export default function CostBreakdown({ itinerary }) {
-  const data = useMemo(() => buildBreakdown(itinerary), [itinerary]);
+export default function CostBreakdown({ itinerary, selectedHotelIndex = 0, selectedFlightIndex = 0 }) {
+  const data = useMemo(
+    () => buildBreakdown(itinerary, selectedHotelIndex, selectedFlightIndex),
+    [itinerary, selectedHotelIndex, selectedFlightIndex]
+  );
 
   if (!data.hasData) {
     return (
