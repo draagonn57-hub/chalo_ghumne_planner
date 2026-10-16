@@ -7,9 +7,9 @@ export default function Footer() {
         <div>
           <div className="flex items-center gap-2">
             <img
-              src="/assets/images/image.png"
+              src="/assets/images/logo.png"
               alt="Chalo Ghumne"
-              className="w-11 h-11 object-cover object-top rounded-full"
+              className="w-12 h-12 object-contain rounded-full bg-white/10"
             />
             <div className="font-display text-3xl">Chalo Ghumne</div>
           </div>

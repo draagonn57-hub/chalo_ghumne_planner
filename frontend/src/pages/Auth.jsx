@@ -163,6 +163,11 @@ function AuthLayout({ title, subtitle, children }) {
           className="glass-card animate-glass-pop w-full max-w-md p-8 sm:p-10"
           data-testid="auth-glass-card"
         >
+          <img
+            src="/assets/images/logo.png"
+            alt="Chalo Ghumne"
+            className="w-14 h-14 object-contain rounded-full mb-5"
+          />
           <h1 className="font-display text-4xl tracking-tight text-[#0A1E28]">
             {title}
           </h1>

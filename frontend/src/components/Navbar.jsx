@@ -67,9 +67,9 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-6 sm:px-10 h-20 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2" data-testid="nav-logo">
           <img
-            src="/assets/images/image.png"
+            src="/assets/images/logo.png"
             alt="Chalo Ghumne"
-            className="w-11 h-11 object-cover object-top rounded-full"
+            className="w-11 h-11 object-contain rounded-full"
           />
           <span className="font-display text-2xl tracking-tight">Chalo Ghumne</span>
         </Link>
