@@ -3,10 +3,13 @@ Gemini-powered destination suggestions and detailed itinerary generation.
 """
 
 import json
+import logging
 import os
 import re
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
 
 from google import genai
 
@@ -65,6 +68,7 @@ Rules:
 - If travel_type is not specified, decide automatically whether each suggestion should be domestic or international.
 - Use the user's budget, duration, origin, interests, companions, diet, and transport to decide what is realistic.
 - Keep all four destinations distinct, varied, and genuinely relevant to the user.
+- If a list of previously suggested destinations is provided, DO NOT suggest any of those places or any spelling variations, aliases, or suburbs of them. Always recommend fresh, unvisited places that match the requested vibe.
 
 IMAGE QUERY RULES:
 
@@ -672,22 +676,185 @@ Origin: {prefs.get("origin") or "Not specified"}
 
 
 # ============================================================
+# DESTINATION NAME MATCHING & DEDUPLICATION
+# ============================================================
+
+COMMON_ALIASES = {
+    # India
+    "bengaluru": "bangalore",
+    "bangalore": "bangalore",
+    "puducherry": "pondicherry",
+    "pondicherry": "pondicherry",
+    "varanasi": "varanasi",
+    "banaras": "varanasi",
+    "benares": "varanasi",
+    "kashi": "varanasi",
+    "mumbai": "mumbai",
+    "bombay": "mumbai",
+    "prayagraj": "allahabad",
+    "allahabad": "allahabad",
+    "chennai": "chennai",
+    "madras": "chennai",
+    "kolkata": "kolkata",
+    "calcutta": "kolkata",
+    "kochi": "kochi",
+    "cochin": "kochi",
+    "thiruvananthapuram": "trivandrum",
+    "trivandrum": "trivandrum",
+    "kozhikode": "calicut",
+    "calicut": "calicut",
+    "vadodara": "baroda",
+    "baroda": "baroda",
+    "mysuru": "mysore",
+    "mysore": "mysore",
+    "shimla": "simla",
+    "simla": "simla",
+    "gurugram": "gurgaon",
+    "gurgaon": "gurgaon",
+    "panaji": "goa",
+    "north goa": "goa",
+    "south goa": "goa",
+    "leh": "ladakh",
+    "leh ladakh": "ladakh",
+    "ladakh": "ladakh",
+    # International
+    "rome": "rome",
+    "roma": "rome",
+}
+
+
+def normalize_destination_name(name: str) -> str:
+    """Normalize destination names to lowercase alphanumeric tokens, resolving common aliases."""
+    if not name:
+        return ""
+    s = name.lower().strip()
+    s = re.sub(r"[^\w\s]", "", s)
+    s = re.sub(r"\s+", " ", s).strip()
+    return COMMON_ALIASES.get(s, s)
+
+
+def is_duplicate_destination(
+    candidate_name: str,
+    reference_names: List[str],
+) -> bool:
+    """
+    Check if candidate destination is duplicate or an alias/variation
+    of any destination in reference_names.
+    """
+    cand_norm = normalize_destination_name(candidate_name)
+    if not cand_norm:
+        return False
+
+    cand_words = set(cand_norm.split())
+
+    for ref in reference_names:
+        ref_norm = normalize_destination_name(ref)
+        if not ref_norm:
+            continue
+        # Exact match or alias match
+        if cand_norm == ref_norm:
+            return True
+        # Substring match if meaningful length
+        if len(cand_norm) > 3 and len(ref_norm) > 3:
+            if cand_norm in ref_norm or ref_norm in cand_norm:
+                return True
+        # Token overlap match
+        ref_words = set(ref_norm.split())
+        if cand_words and ref_words:
+            if cand_words.issubset(ref_words) or ref_words.issubset(cand_words):
+                return True
+
+    return False
+
+
+def _validate_and_filter_suggestions(
+    raw_suggestions: list,
+    excluded_names: List[str],
+) -> List[Dict[str, Any]]:
+    """
+    Validate structure of suggestions and filter out any duplicates
+    or previously suggested destinations.
+    """
+    valid = []
+    seen_names = []
+
+    for item in raw_suggestions:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name", "")).strip()
+        if not name:
+            continue
+
+        # Check if already seen in current batch
+        if is_duplicate_destination(name, seen_names):
+            continue
+
+        # Check if matches any previously excluded destination
+        if is_duplicate_destination(name, excluded_names):
+            continue
+
+        country = str(item.get("country", "")).strip() or "India"
+        why = (
+            str(item.get("why", "")).strip()
+            or "A wonderful destination matching your travel preferences."
+        )
+        image_query = (
+            str(item.get("image_query", "")).strip()
+            or f"{name} {country} travel scenic photography"
+        )
+
+        valid.append({
+            "name": name,
+            "country": country,
+            "why": why,
+            "image_query": image_query,
+        })
+        seen_names.append(name)
+
+    return valid
+
+
+# ============================================================
 # DESTINATION SUGGESTIONS
 # ============================================================
 
 async def generate_suggestions(
     prefs: Dict[str, Any],
+    exclude_destinations: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Generate four destination suggestions based on
-    questionnaire preferences.
+    questionnaire preferences, avoiding any previously suggested destinations.
     """
+    if exclude_destinations is None:
+        exclude_destinations = prefs.get("exclude_destinations", []) or []
+
+    # Clean and filter excluded list
+    excluded_clean = [
+        str(d).strip() for d in exclude_destinations if str(d).strip()
+    ]
+
+    exclusion_section = ""
+    if excluded_clean:
+        items_bullet = "\n".join(f"- {d}" for d in excluded_clean)
+        exclusion_section = f"""
+PREVIOUSLY SUGGESTED DESTINATIONS (STRICTLY DO NOT REPEAT):
+The user has already been shown the following destination recommendations:
+{items_bullet}
+
+STRICT EXCLUSION & DIVERSITY RULES:
+- You MUST NOT repeat any of the destinations listed above.
+- You MUST NOT suggest spelling variations, transliterations, aliases, or alternative names for any previously suggested destination (e.g. if "Bangalore" was suggested, do not suggest "Bengaluru"; if "Pondicherry", do not suggest "Puducherry"; if "Varanasi", do not suggest "Banaras" or "Kashi"; if "Mumbai", do not suggest "Bombay").
+- You MUST NOT suggest specific neighborhoods, beaches, or suburbs of previously suggested destinations (e.g. if "Goa" was suggested, do not suggest "Calangute" or "Panaji").
+- OFFER FRESH ALTERNATIVES: Suggest completely new destinations that maintain the user's desired vibe and travel preferences, but give them exciting new options.
+- Recommend exactly FOUR (4) new, distinct destinations.
+"""
 
     prompt = f"""
 User travel preferences:
 
 {_preference_text(prefs)}
-
+{exclusion_section}
 Generate exactly four suitable destination suggestions.
 
 Make sure all four destinations are distinct and genuinely
@@ -696,10 +863,58 @@ match the user's preferences.
 Return ONLY the required JSON.
 """
 
-    return _call(
+    data = _call(
         prompt,
         SUGGESTION_PROMPT,
     )
+
+    validated_suggestions = _validate_and_filter_suggestions(
+        data.get("suggestions", []),
+        excluded_clean,
+    )
+
+    # If Gemini returned fewer than 4 valid non-duplicate suggestions, do a single targeted retry
+    if len(validated_suggestions) < 4:
+        needed = 4 - len(validated_suggestions)
+        current_excluded = excluded_clean + [s["name"] for s in validated_suggestions]
+        retry_prompt = f"""
+User travel preferences:
+
+{_preference_text(prefs)}
+
+PREVIOUSLY SUGGESTED DESTINATIONS (DO NOT REPEAT):
+{chr(10).join(f"- {d}" for d in current_excluded)}
+
+IMPORTANT: Provide {needed} MORE brand-new, distinct destinations that match the user's preferences and have NOT been suggested yet.
+
+Return ONLY valid JSON with schema:
+{{
+    "suggestions": [
+        {{
+            "name": "string",
+            "country": "string",
+            "why": "one concise sentence explaining why this destination fits",
+            "image_query": "specific real travel photo search phrase"
+        }}
+    ]
+}}
+"""
+        try:
+            retry_data = _call(retry_prompt, SUGGESTION_PROMPT)
+            retry_items = _validate_and_filter_suggestions(
+                retry_data.get("suggestions", []),
+                current_excluded,
+            )
+            for item in retry_items:
+                if len(validated_suggestions) < 4:
+                    validated_suggestions.append(item)
+        except Exception as retry_err:
+            logger.warning("Retry suggestion fetch failed: %s", retry_err)
+
+    if len(validated_suggestions) < 4:
+        raise ValueError("Could not find four distinct new destinations matching your preferences.")
+
+    return {"suggestions": validated_suggestions[:4]}
 
 
 # ============================================================

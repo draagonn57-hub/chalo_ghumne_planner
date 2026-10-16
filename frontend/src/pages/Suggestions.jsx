@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, MapPin, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowRight, Compass, MapPin, Sparkles } from "lucide-react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import AILoadingChecklist from "@/components/AILoadingChecklist";
@@ -55,7 +55,29 @@ export default function Suggestions({ mode }) {
   const [busy, setBusy] = useState(null);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(false);
+  const [exploringMore, setExploringMore] = useState(false);
+  const [exploredHistory, setExploredHistory] = useState(() => {
+    try {
+      const rawHistory = sessionStorage.getItem("tp_explored_history");
+      return rawHistory ? JSON.parse(rawHistory) : [];
+    } catch {
+      return [];
+    }
+  });
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (data?.suggestions) {
+      const names = data.suggestions.map((s) => s.name).filter(Boolean);
+      setExploredHistory((prev) => {
+        const merged = Array.from(new Set([...prev, ...names]));
+        try {
+          sessionStorage.setItem("tp_explored_history", JSON.stringify(merged));
+        } catch {}
+        return merged;
+      });
+    }
+  }, [data]);
 
   useEffect(() => {
     if (mode === "recommended") {
@@ -101,6 +123,66 @@ export default function Suggestions({ mode }) {
       setLoading(false);
     } finally {
       setBusy(null);
+    }
+  };
+
+  const exploreMore = async () => {
+    if (exploringMore || busy !== null || !data?.preferences) return;
+
+    setExploringMore(true);
+
+    try {
+      const currentNames = (data.suggestions || []).map((s) => s.name).filter(Boolean);
+      const allExcluded = Array.from(
+        new Set([
+          ...exploredHistory,
+          ...currentNames,
+          ...(data.visited || []),
+        ])
+      );
+
+      const payload = {
+        ...data.preferences,
+        exclude_destinations: allExcluded,
+      };
+
+      const res = await api.post("/itinerary/generate", payload);
+      const newSuggestions = res.data?.suggestions;
+
+      if (!Array.isArray(newSuggestions) || newSuggestions.length !== 4) {
+        throw new Error("We couldn't find more places right now. Please try again in a little while.");
+      }
+
+      const newNames = newSuggestions.map((s) => s.name).filter(Boolean);
+      const nextHistory = Array.from(new Set([...allExcluded, ...newNames]));
+      setExploredHistory(nextHistory);
+      try {
+        sessionStorage.setItem("tp_explored_history", JSON.stringify(nextHistory));
+      } catch {}
+
+      const nextData = {
+        ...data,
+        suggestions: newSuggestions,
+      };
+      setData(nextData);
+      try {
+        sessionStorage.setItem("tp_last_suggestions", JSON.stringify(nextData));
+      } catch {}
+
+      toast.success("Here are four new destinations to explore!");
+    } catch (err) {
+      const status = err?.response?.status;
+      const detail = err?.response?.data?.detail;
+      const errorMsg =
+        status === 429 ||
+        detail?.toLowerCase().includes("quota") ||
+        detail?.toLowerCase().includes("rate")
+          ? "We couldn't find more places right now. Please try again in a little while."
+          : detail || "We couldn't find more places right now. Please try again in a little while.";
+
+      toast.error(errorMsg);
+    } finally {
+      setExploringMore(false);
     }
   };
 
@@ -160,7 +242,11 @@ export default function Suggestions({ mode }) {
           </p>
         </motion.div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-10">
+        <div
+          className={`grid sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-10 transition-opacity duration-300 ${
+            exploringMore ? "opacity-75 pointer-events-none" : ""
+          }`}
+        >
           {(data.suggestions || []).map((d, i) => (
             <motion.button
               key={`${d.name}-${i}`}
@@ -169,7 +255,7 @@ export default function Suggestions({ mode }) {
               initial="hidden"
               animate="visible"
               onClick={() => choose(d, i)}
-              disabled={busy !== null}
+              disabled={busy !== null || exploringMore}
               className="tp-card overflow-hidden text-left group disabled:opacity-70 relative"
               data-testid={`suggestion-card-${i}`}
             >
@@ -211,6 +297,47 @@ export default function Suggestions({ mode }) {
               </div>
             </motion.button>
           ))}
+        </div>
+
+        {/* Explore More Places Button Section */}
+        <div className="mt-12 pt-8 border-t border-slate-100 flex flex-col items-center text-center">
+          <button
+            type="button"
+            onClick={exploreMore}
+            disabled={exploringMore || busy !== null}
+            className="btn-secondary group inline-flex items-center justify-center gap-2.5 w-full sm:w-auto px-7 py-3.5 text-sm sm:text-base font-semibold shadow-sm hover:shadow-md transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer"
+            data-testid="explore-more-btn"
+          >
+            {exploringMore ? (
+              <>
+                <Sparkles size={18} className="text-[#E76F51] animate-spin" />
+                <span>Finding your next favourite places…</span>
+              </>
+            ) : (
+              <>
+                <Compass
+                  size={19}
+                  className="text-[#0D5C75] transition-transform duration-500 group-hover:rotate-45"
+                />
+                <span>✦ Explore More Places</span>
+              </>
+            )}
+          </button>
+
+          <p className="text-xs sm:text-sm text-slate-500 mt-3 max-w-md">
+            Not finding your perfect place? Discover four more destinations.
+          </p>
+
+          {exploringMore && (
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-3.5 inline-flex items-center gap-2 text-xs font-medium text-[#0D5C75] bg-[#0D5C75]/8 px-3.5 py-1.5 rounded-full"
+            >
+              <Sparkles size={14} className="text-[#E76F51] animate-pulse" />
+              <span>Finding your next favourite places…</span>
+            </motion.div>
+          )}
         </div>
         </div>
       </div>

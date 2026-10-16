@@ -158,6 +158,7 @@ export default function Questionnaire() {
       const payload = { ...state, duration_days: Number(state.duration_days) };
       const { data } = await api.post("/itinerary/generate", payload);
       sessionStorage.setItem("tp_last_suggestions", JSON.stringify(data));
+      sessionStorage.removeItem("tp_explored_history");
       toast.success("Four destinations are ready to explore");
       setLoading(false);
       setTimeout(() => nav("/itinerary/suggestions"), 300);

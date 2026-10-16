@@ -104,6 +104,8 @@ class QuestionnaireIn(BaseModel):
 
     start_date: Optional[str] = None
 
+    exclude_destinations: List[str] = Field(default_factory=list)
+
 
 # ------------------------------------------------------------
 # ITINERARY
@@ -642,13 +644,15 @@ async def generate(
 ):
 
     prefs = body.model_dump()
+    exclude = prefs.get("exclude_destinations", [])
 
     try:
 
         # First-stage AI generation:
         # Generates destination suggestions
         result = await generate_suggestions(
-            prefs
+            prefs,
+            exclude_destinations=exclude,
         )
 
     except Exception as e:
@@ -657,12 +661,22 @@ async def generate(
             "AI suggestions generation failed"
         )
 
+        err_msg = str(e).lower()
+        if (
+            "429" in err_msg
+            or "quota" in err_msg
+            or "resource_exhausted" in err_msg
+            or "rate limit" in err_msg
+            or "rate_limit" in err_msg
+        ):
+            raise HTTPException(
+                status_code=429,
+                detail="We couldn't find more places right now. Please try again in a little while.",
+            )
+
         raise HTTPException(
             status_code=502,
-            detail=(
-                "AI generation failed: "
-                f"{str(e)[:200]}"
-            ),
+            detail="We couldn't find more places right now. Please try again in a little while.",
         )
 
     return {
