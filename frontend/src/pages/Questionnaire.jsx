@@ -86,9 +86,9 @@ function getBudgetEstimates(days) {
 }
 
 const BUDGET_OPTIONS = [
-  { v: "budget",    label: "Backpacker", desc: "Hostels & street food",       icon: Wallet },
-  { v: "mid-range", label: "Balanced",   desc: "Comfort & experiences",        icon: Wallet },
-  { v: "luxury",    label: "Luxury",     desc: "Boutique stays & fine dining", icon: Wallet },
+  { v: "budget",    label: "Low Budget",    desc: "Affordable stays & local food",    icon: Wallet },
+  { v: "mid-range", label: "Medium Budget", desc: "Comfortable stays & experiences",  icon: Wallet },
+  { v: "luxury",    label: "High Budget",   desc: "Premium stays & fine dining",      icon: Wallet },
 ];
 
 const DIET_OPTIONS = [
@@ -324,6 +324,13 @@ export default function Questionnaire() {
                 </div>
               ) : current.type === "multi" ? (
                 <div>
+                  <div className="flex items-start gap-3 px-5 py-4 rounded-2xl bg-[#E76F51]/5 border border-[#E76F51]/15 mb-8">
+                    <Sparkles size={18} className="text-[#E76F51] mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-semibold text-slate-800 text-sm">Make it your kind of trip!</span>
+                      <p className="text-slate-500 text-sm mt-0.5">Choose as many interests as you like. Mix and match your favorites to create a trip that suits you.</p>
+                    </div>
+                  </div>
                   <div className={`grid gap-4 ${current.options.length > 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
                     {current.options.map((option) => (
                       <Choice
