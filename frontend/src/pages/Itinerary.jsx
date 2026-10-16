@@ -381,33 +381,13 @@ function ItineraryView({
 
   const handleSelectHotel = useCallback((idx) => {
     setSelectedHotel(idx);
-    updateLocalIt((prev) => {
-      const next = { ...prev };
-      const hotels = [...(next.hotels || [])];
-      if (hotels.length > 0) {
-        const selected = hotels[idx];
-        hotels.unshift(hotels.splice(idx, 1)[0]);
-        next.hotels = hotels;
-        next.estimated_total_cost = next.estimated_total_cost;
-      }
-      return next;
-    });
     if (!isPreview) {
       toast.info("Hotel selection saved when you save the trip. Full persistence needs a PUT /api/itinerary/{id} endpoint.");
     }
-  }, [isPreview, updateLocalIt]);
+  }, [isPreview]);
 
   const handleSelectFlight = useCallback((idx) => {
     setSelectedFlight(idx);
-    updateLocalIt((prev) => {
-      const next = { ...prev };
-      const flights = [...(next.flights || [])];
-      if (flights.length > 0) {
-        flights.unshift(flights.splice(idx, 1)[0]);
-        next.flights = flights;
-      }
-      return next;
-    });
     if (!isPreview) {
       toast.info("Flight selection saved when you save the trip. Full persistence needs a PUT /api/itinerary/{id} endpoint.");
     }
@@ -664,6 +644,7 @@ function ItineraryView({
           <ItineraryMap itinerary={localIt} />
         </div>
       </section>
+
 
       {/* Day-by-day timeline */}
       <section
@@ -981,7 +962,7 @@ function ItineraryView({
           A detailed breakdown of your estimated trip costs — flights, stays, food, activities, and more.
         </p>
         <div className="mt-8">
-          <CostBreakdown itinerary={localIt} />
+          <CostBreakdown itinerary={localIt} selectedHotelIndex={selectedHotel} selectedFlightIndex={selectedFlight} />
         </div>
       </section>
 
