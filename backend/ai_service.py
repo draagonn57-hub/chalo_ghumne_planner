@@ -661,9 +661,17 @@ def _preference_text(
     else:
         scope_text = "Destination scope: The AI should decide automatically between domestic and international travel."
 
+    diet_pref = prefs.get("diet", "veg")
+    if diet_pref in ("flexitarian", "both", "all"):
+        diet_text = "Flexitarian (enjoys both vegetarian and non-vegetarian food — combination of both)"
+    elif diet_pref == "non-veg":
+        diet_text = "Non-Vegetarian"
+    else:
+        diet_text = "Vegetarian"
+
     return f"""
 {scope_text}
-Diet: {prefs.get("diet", "veg")}
+Diet: {diet_text}
 Budget tier: {budget}
 Approximate total budget (all-inclusive per person for {days} days): {budget_range_hint}
 IMPORTANT: All hotels, activities, food, and transport recommendations MUST stay within the above budget range. Do NOT recommend anything that would exceed this budget.

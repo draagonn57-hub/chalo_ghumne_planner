@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Utensils, Wallet, Sparkles, Users, Mountain, Music4, Landmark, Save as Waves, Leaf, ChefHat, ArrowLeft, ArrowRight, Check, Calendar, Globe, MapPin } from "lucide-react";
+import { Utensils, UtensilsCrossed, Wallet, Sparkles, Users, Mountain, Music4, Landmark, Save as Waves, Leaf, ChefHat, ArrowLeft, ArrowRight, Check, Calendar, Globe, MapPin } from "lucide-react";
 import AILoadingChecklist from "@/components/AILoadingChecklist";
 
 const SUGGESTION_STEPS = [
@@ -94,7 +94,14 @@ const BUDGET_OPTIONS = [
 const DIET_OPTIONS = [
   { v: "veg", label: "Vegetarian", desc: "Plant-forward menus", icon: Leaf },
   { v: "non-veg", label: "Non-Vegetarian", desc: "Anything on the menu", icon: ChefHat },
+  { v: "flexitarian", label: "Flexitarian", desc: "Best of both — veg & non-veg", icon: UtensilsCrossed },
 ];
+
+const DIET_LABELS = {
+  veg: "Vegetarian",
+  "non-veg": "Non-Vegetarian",
+  flexitarian: "Flexitarian (Veg & Non-Veg)",
+};
 
 const TRAVEL_TYPE_OPTIONS = [
   { v: "domestic", label: "Domestic", desc: "Travel within India", icon: MapPin },
@@ -357,7 +364,7 @@ export default function Questionnaire() {
                       <h3 className="font-display text-2xl">Food preference</h3>
                     </div>
                     <p className="text-slate-500 text-sm mb-5">This determines your dietary requirements — not the same as the Food interest above.</p>
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid gap-4 sm:grid-cols-3">
                       {DIET_OPTIONS.map((option) => (
                         <Choice
                           key={option.v}
@@ -432,7 +439,7 @@ export default function Questionnaire() {
                 ["Start date", state.start_date || "Not set"],
                 ["Companions", state.companions],
                 ["Interests", state.interests.join(", ")],
-                ["Food preference", state.diet],
+                ["Food preference", DIET_LABELS[state.diet] || state.diet],
                 ["Origin", state.origin || "—"],
               ].map(([key, value]) => (
                 <div key={key}>
