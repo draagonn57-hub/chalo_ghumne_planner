@@ -60,12 +60,10 @@ Rules:
 - All 4 destinations must be distinct.
 - Do not repeat a city.
 - Prefer destinations that genuinely match the user's preferences.
-- Decide automatically whether each suggestion should be domestic or international.
-- Do NOT assume the user wants an Indian destination.
+- IMPORTANT: If travel_type is "domestic", ALL four destinations MUST be within India.
+- IMPORTANT: If travel_type is "international", ALL four destinations MUST be outside India.
+- If travel_type is not specified, decide automatically whether each suggestion should be domestic or international.
 - Use the user's budget, duration, origin, interests, companions, diet, and transport to decide what is realistic.
-- International destinations are allowed and should be suggested when they are a good fit for the user's preferences and realistic for the stated budget and duration.
-- Domestic destinations are also allowed when they are a better fit.
-- Do not ask the user whether they want domestic or international travel.
 - Keep all four destinations distinct, varied, and genuinely relevant to the user.
 
 IMAGE QUERY RULES:
@@ -213,10 +211,9 @@ CORE ITINERARY RULES
 - Respect the user's interests.
 - Respect the user's companions.
 - Consider the user's origin.
-- The AI decides whether the trip is domestic or international based on the user's preferences.
-- Do NOT assume the trip must be within India.
-- International travel is allowed when it is realistic for the user's budget, duration, and origin.
-- Domestic travel is allowed when it is a better fit.
+- If the user selected travel_type "domestic", the trip must be within India.
+- If the user selected travel_type "international", the trip must be outside India.
+- If travel_type is not specified, the AI decides based on the user's preferences.
 - Prices must be reasonable estimates.
 - Hotels must match the requested budget tier.
 - Provide SIX varied hotel options when possible.
@@ -652,8 +649,16 @@ def _preference_text(
             f"3-star hotels, restaurant meals, economy transport)"
         )
 
+    travel_type = prefs.get("travel_type", "")
+    if travel_type == "domestic":
+        scope_text = "Destination scope: DOMESTIC ONLY — All destinations MUST be within India. Do NOT suggest any international destinations."
+    elif travel_type == "international":
+        scope_text = "Destination scope: INTERNATIONAL ONLY — All destinations MUST be outside India. Do NOT suggest any Indian destinations."
+    else:
+        scope_text = "Destination scope: The AI should decide automatically between domestic and international travel."
+
     return f"""
-Destination scope: The AI should decide automatically between domestic and international travel.
+{scope_text}
 Diet: {prefs.get("diet", "veg")}
 Budget tier: {budget}
 Approximate total budget (all-inclusive per person for {days} days): {budget_range_hint}

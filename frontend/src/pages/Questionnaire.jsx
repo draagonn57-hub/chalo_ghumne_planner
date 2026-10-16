@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Utensils, Wallet, Sparkles, Users, Mountain, Music4, Landmark, Save as Waves, Leaf, ChefHat, ArrowLeft, ArrowRight, Check, Calendar } from "lucide-react";
+import { Utensils, Wallet, Sparkles, Users, Mountain, Music4, Landmark, Save as Waves, Leaf, ChefHat, ArrowLeft, ArrowRight, Check, Calendar, Globe, MapPin } from "lucide-react";
 import AILoadingChecklist from "@/components/AILoadingChecklist";
 
 const SUGGESTION_STEPS = [
@@ -20,9 +20,9 @@ const STEPS = [
     type: "range",
   },
   {
-    key: "budget_diet",
-    title: "How lavish — and what's on the menu?",
-    sub: "Set the spending tone and food philosophy.",
+    key: "budget_type",
+    title: "Set your budget & travel scope",
+    sub: "Choose your spending style and where you want to go.",
     type: "combined",
   },
   {
@@ -96,9 +96,15 @@ const DIET_OPTIONS = [
   { v: "non-veg", label: "Non-Vegetarian", desc: "Anything on the menu", icon: ChefHat },
 ];
 
+const TRAVEL_TYPE_OPTIONS = [
+  { v: "domestic", label: "Domestic", desc: "Travel within India", icon: MapPin },
+  { v: "international", label: "International", desc: "Travel outside India", icon: Globe },
+];
+
 const DEFAULTS = {
   diet: "",
   budget: "",
+  travel_type: "",
   duration_days: 5,
   start_date: "",
   interests: [],
@@ -125,8 +131,8 @@ export default function Questionnaire() {
   const progress = ((step + 1) / (STEPS.length + 1)) * 100;
 
   const canProceed = () => {
-    if (current?.type === "combined") return !!state.budget && !!state.diet;
-    if (current?.type === "multi") return state.interests.length > 0;
+    if (current?.type === "combined") return !!state.budget && !!state.travel_type;
+    if (current?.type === "multi") return state.interests.length > 0 && !!state.diet;
     if (current?.type === "range") return state.duration_days > 0;
     return !!state[current?.key];
   };
@@ -273,8 +279,9 @@ export default function Questionnaire() {
                   </label>
                 </div>
               ) : current.type === "combined" ? (
-                <div className="tp-card p-8 space-y-8">
-                  <div>
+                <div className="grid gap-6 sm:grid-cols-2">
+                  {/* Left — Spending Style */}
+                  <div className="tp-card p-8">
                     <div className="flex items-center gap-2 mb-5">
                       <div className="w-8 h-8 rounded-full bg-[#E76F51]/10 text-[#E76F51] flex items-center justify-center text-sm font-bold">1</div>
                       <h3 className="font-display text-2xl">Spending style</h3>
@@ -282,7 +289,7 @@ export default function Questionnaire() {
                     {(() => {
                       const estimates = getBudgetEstimates(state.duration_days);
                       return (
-                        <div className="grid gap-4 sm:grid-cols-3">
+                        <div className="grid gap-4">
                           {BUDGET_OPTIONS.map((option) => (
                             <BudgetChoice
                               key={option.v}
@@ -297,12 +304,49 @@ export default function Questionnaire() {
                       );
                     })()}
                   </div>
-                  <div className="h-px bg-slate-100" />
-                  <div>
+                  {/* Right — Travel Type */}
+                  <div className="tp-card p-8">
                     <div className="flex items-center gap-2 mb-5">
                       <div className="w-8 h-8 rounded-full bg-[#E76F51]/10 text-[#E76F51] flex items-center justify-center text-sm font-bold">2</div>
-                      <h3 className="font-display text-2xl">Food philosophy</h3>
+                      <h3 className="font-display text-2xl">Travel type</h3>
                     </div>
+                    <div className="grid gap-4">
+                      {TRAVEL_TYPE_OPTIONS.map((option) => (
+                        <Choice
+                          key={option.v}
+                          option={option}
+                          selected={state.travel_type === option.v}
+                          onClick={() => setState({ ...state, travel_type: option.v })}
+                          testId={`choice-travel-type-${option.v}`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : current.type === "multi" ? (
+                <div>
+                  <div className={`grid gap-4 ${current.options.length > 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
+                    {current.options.map((option) => (
+                      <Choice
+                        key={option.v}
+                        option={option}
+                        selected={state.interests.includes(option.v)}
+                        onClick={() => pick(option.v)}
+                        testId={`choice-${current.key}-${option.v}`}
+                        multi
+                      />
+                    ))}
+                  </div>
+                  {/* Food Preference — separated section */}
+                  <div className="mt-10">
+                    <div className="h-px bg-slate-100 mb-8" />
+                    <div className="flex items-center gap-2 mb-5">
+                      <div className="w-8 h-8 rounded-full bg-[#E76F51]/10 text-[#E76F51] flex items-center justify-center text-sm font-bold">
+                        <Utensils size={14} />
+                      </div>
+                      <h3 className="font-display text-2xl">Food preference</h3>
+                    </div>
+                    <p className="text-slate-500 text-sm mb-5">This determines your dietary requirements — not the same as the Food interest above.</p>
                     <div className="grid gap-4 sm:grid-cols-2">
                       {DIET_OPTIONS.map((option) => (
                         <Choice
@@ -322,10 +366,9 @@ export default function Questionnaire() {
                     <Choice
                       key={option.v}
                       option={option}
-                      selected={current.type === "multi" ? state.interests.includes(option.v) : state[current.key] === option.v}
+                      selected={state[current.key] === option.v}
                       onClick={() => pick(option.v)}
                       testId={`choice-${current.key}-${option.v}`}
-                      multi={current.type === "multi"}
                     />
                   ))}
                 </div>
@@ -373,12 +416,13 @@ export default function Questionnaire() {
             </p>
             <div className="tp-card p-8 mt-8 grid sm:grid-cols-2 gap-4 text-sm">
               {[
-                ["Diet", state.diet],
                 ["Budget", state.budget],
+                ["Travel type", state.travel_type],
                 ["Duration", `${state.duration_days} days`],
                 ["Start date", state.start_date || "Not set"],
                 ["Companions", state.companions],
                 ["Interests", state.interests.join(", ")],
+                ["Food preference", state.diet],
                 ["Origin", state.origin || "—"],
               ].map(([key, value]) => (
                 <div key={key}>

@@ -90,6 +90,9 @@ class QuestionnaireIn(BaseModel):
     budget: str
     # budget | mid-range | luxury
 
+    travel_type: str = ""
+    # domestic | international
+
     duration_days: int
 
     interests: List[str]
