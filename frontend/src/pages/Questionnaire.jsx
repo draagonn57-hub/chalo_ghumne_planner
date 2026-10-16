@@ -279,9 +279,8 @@ export default function Questionnaire() {
                   </label>
                 </div>
               ) : current.type === "combined" ? (
-                <div className="grid gap-6 sm:grid-cols-2">
-                  {/* Left — Spending Style */}
-                  <div className="tp-card p-8">
+                <div className="tp-card p-8 space-y-8">
+                  <div>
                     <div className="flex items-center gap-2 mb-5">
                       <div className="w-8 h-8 rounded-full bg-[#E76F51]/10 text-[#E76F51] flex items-center justify-center text-sm font-bold">1</div>
                       <h3 className="font-display text-2xl">Spending style</h3>
@@ -289,7 +288,7 @@ export default function Questionnaire() {
                     {(() => {
                       const estimates = getBudgetEstimates(state.duration_days);
                       return (
-                        <div className="grid gap-4">
+                        <div className="grid gap-4 sm:grid-cols-3">
                           {BUDGET_OPTIONS.map((option) => (
                             <BudgetChoice
                               key={option.v}
@@ -304,13 +303,13 @@ export default function Questionnaire() {
                       );
                     })()}
                   </div>
-                  {/* Right — Travel Type */}
-                  <div className="tp-card p-8">
+                  <div className="h-px bg-slate-100" />
+                  <div>
                     <div className="flex items-center gap-2 mb-5">
                       <div className="w-8 h-8 rounded-full bg-[#E76F51]/10 text-[#E76F51] flex items-center justify-center text-sm font-bold">2</div>
                       <h3 className="font-display text-2xl">Travel type</h3>
                     </div>
-                    <div className="grid gap-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
                       {TRAVEL_TYPE_OPTIONS.map((option) => (
                         <Choice
                           key={option.v}
