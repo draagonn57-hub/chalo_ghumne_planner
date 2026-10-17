@@ -6,12 +6,11 @@ import { toast } from "sonner";
 
 export function GoogleSignInButton({ onResponse, text = "continue_with", disabled = false }) {
   const containerRef = useRef(null);
+  const clientId =
+    process.env.REACT_APP_GOOGLE_CLIENT_ID ||
+    "84500475860-kt6nbrh7k16b804utd9f39c2m44kg95q.apps.googleusercontent.com";
 
   useEffect(() => {
-    const clientId =
-      process.env.REACT_APP_GOOGLE_CLIENT_ID ||
-      "your-google-client-id.apps.googleusercontent.com";
-
     // Attach response handler to window so declarative callback also functions
     window.handleGoogleCredentialResponse = onResponse;
 
@@ -64,14 +63,25 @@ export function GoogleSignInButton({ onResponse, text = "continue_with", disable
 
       return () => clearInterval(interval);
     }
-  }, [onResponse, text]);
+  }, [onResponse, text, clientId]);
 
   return (
     <div className="w-full">
+      {/* Declarative GIS container with real data-client_id */}
+      <div
+        id="g_id_onload"
+        data-client_id="84500475860-kt6nbrh7k16b804utd9f39c2m44kg95q.apps.googleusercontent.com"
+        data-context="signin"
+        data-ux_mode="popup"
+        data-callback="handleGoogleCredentialResponse"
+        data-auto_prompt="false"
+      ></div>
+
       <div
         ref={containerRef}
         id="google-signin-btn"
         data-testid="google-signin-btn"
+        data-client_id="84500475860-kt6nbrh7k16b804utd9f39c2m44kg95q.apps.googleusercontent.com"
         className="w-full flex justify-center min-h-[44px]"
       >
         <button
