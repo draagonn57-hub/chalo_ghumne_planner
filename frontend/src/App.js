@@ -70,16 +70,19 @@ function RequireAdmin({ children }) {
 function Shell() {
   const location = useLocation();
   const isLanding = location.pathname === "/";
+  const isItineraryPage = location.pathname.startsWith("/itinerary");
   // Auth pages manage their own gradient overlay on top of the global background
   const isAuthPage = ["/login", "/signup", "/forgot", "/reset"].includes(location.pathname);
 
   return (
-    <div className="relative min-h-screen">
+    <div className={`relative min-h-screen${isItineraryPage ? " itinerary-shell" : ""}`}
+         style={isItineraryPage ? { background: "#EDE0CE" } : {}}>
       {/*
-        Global cycling background — only shown on non-Landing pages.
+        Global cycling background — only shown on non-Landing and non-Itinerary pages.
         Landing has its own DynamicBackground inside the hero section.
+        Itinerary pages have botanical beige background via CSS module.
       */}
-      {!isLanding && (
+      {!isLanding && !isItineraryPage && (
         <DynamicBackground
           mode="cycle"
           overlayClassName=""

@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import SmartImage from "@/components/SmartImage";
+import styles from "./Itinerary.module.css";
 
 import {
   Save,
@@ -440,10 +441,55 @@ function ItineraryView({
   };
 
   return (
-    <div
-      className="max-w-6xl mx-auto px-6 py-10 sm:py-14"
-      data-testid="itinerary-view"
->
+    <div className={styles.itineraryPage} data-testid="itinerary-view">
+
+      {/* ── Botanical corner decorations ─────────────────────── */}
+      {/* Top-right large leaves */}
+      <svg className={styles.botanicalTopRight} viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M320 0 C280 60, 200 80, 160 160 C120 240, 80 280, 0 320 C80 260, 140 200, 160 120 C180 40, 260 20, 320 0Z" fill="#4A6741"/>
+        <path d="M320 40 C290 90, 230 110, 200 180 C170 250, 140 285, 60 320 C130 270, 185 215, 200 145 C215 75, 275 50, 320 40Z" fill="#6B8C5A" opacity="0.6"/>
+        <path d="M320 80 C300 120, 255 135, 235 195 C215 255, 195 290, 120 320 C185 280, 230 230, 240 170 C250 110, 290 88, 320 80Z" fill="#8FAF7A" opacity="0.4"/>
+        <path d="M200 0 C190 40, 170 70, 150 110 C130 150, 100 170, 60 200" stroke="#4A6741" strokeWidth="1.5" opacity="0.5"/>
+        <path d="M260 0 C245 50, 220 85, 195 130 C170 175, 145 200, 110 240" stroke="#4A6741" strokeWidth="1.5" opacity="0.4"/>
+        <circle cx="280" cy="30" r="8" fill="#4A6741" opacity="0.15"/>
+        <circle cx="310" cy="80" r="5" fill="#4A6741" opacity="0.12"/>
+      </svg>
+
+      {/* Bottom-left leaves */}
+      <svg className={styles.botanicalBottomLeft} viewBox="0 0 280 280" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M0 280 C60 240, 80 160, 160 120 C240 80, 270 40, 280 0 C220 80, 160 140, 80 160 C0 180, 0 240, 0 280Z" fill="#4A6741"/>
+        <path d="M0 240 C50 210, 75 145, 145 110 C215 75, 250 42, 260 0 C205 72, 152 132, 78 153 C4 174, 0 210, 0 240Z" fill="#6B8C5A" opacity="0.6"/>
+        <path d="M0 200 C40 178, 68 128, 128 100 C188 72, 222 45, 240 0 C190 65, 144 122, 76 144 C8 166, 0 178, 0 200Z" fill="#8FAF7A" opacity="0.4"/>
+        <path d="M0 160 C30 140, 55 110, 90 88 C125 66, 150 50, 180 20" stroke="#4A6741" strokeWidth="1.5" opacity="0.5"/>
+        <circle cx="20" cy="250" r="7" fill="#4A6741" opacity="0.15"/>
+        <circle cx="50" cy="270" r="4" fill="#4A6741" opacity="0.12"/>
+      </svg>
+
+      {/* Mid-left thin branch */}
+      <svg className={styles.botanicalMidLeft} viewBox="0 0 180 300" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M30 300 Q25 250 40 200 Q55 150 35 100 Q15 50 30 0" stroke="#4A6741" strokeWidth="2" fill="none"/>
+        <path d="M40 200 Q80 180 100 150" stroke="#4A6741" strokeWidth="1.5" fill="none"/>
+        <path d="M40 200 Q10 175 0 145" stroke="#4A6741" strokeWidth="1.5" fill="none"/>
+        <path d="M35 130 Q70 108 88 80" stroke="#4A6741" strokeWidth="1.5" fill="none"/>
+        <path d="M35 130 Q5 108 0 80" stroke="#4A6741" strokeWidth="1.5" fill="none"/>
+        <ellipse cx="100" cy="150" rx="20" ry="10" fill="#4A6741" opacity="0.5" transform="rotate(-30 100 150)"/>
+        <ellipse cx="88" cy="80" rx="18" ry="9" fill="#6B8C5A" opacity="0.4" transform="rotate(-20 88 80)"/>
+        <ellipse cx="0" cy="145" rx="18" ry="9" fill="#4A6741" opacity="0.5" transform="rotate(30 0 145)"/>
+      </svg>
+
+      {/* Mid-right thin branch */}
+      <svg className={styles.botanicalMidRight} viewBox="0 0 180 300" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <path d="M150 300 Q155 250 140 200 Q125 150 145 100 Q165 50 150 0" stroke="#4A6741" strokeWidth="2" fill="none"/>
+        <path d="M140 200 Q100 180 80 150" stroke="#4A6741" strokeWidth="1.5" fill="none"/>
+        <path d="M140 200 Q170 175 180 145" stroke="#4A6741" strokeWidth="1.5" fill="none"/>
+        <path d="M145 130 Q110 108 92 80" stroke="#4A6741" strokeWidth="1.5" fill="none"/>
+        <path d="M145 130 Q175 108 180 80" stroke="#4A6741" strokeWidth="1.5" fill="none"/>
+        <ellipse cx="80" cy="150" rx="20" ry="10" fill="#4A6741" opacity="0.5" transform="rotate(30 80 150)"/>
+        <ellipse cx="92" cy="80" rx="18" ry="9" fill="#6B8C5A" opacity="0.4" transform="rotate(20 92 80)"/>
+        <ellipse cx="180" cy="145" rx="18" ry="9" fill="#4A6741" opacity="0.5" transform="rotate(-30 180 145)"/>
+      </svg>
+
+    <div className={styles.itineraryContent}>
       {/* Header */}
       <div className="tp-card p-8 sm:p-10">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1077,6 +1123,7 @@ function ItineraryView({
           done={false}
         />
       )}
+    </div>
     </div>
   );
 }

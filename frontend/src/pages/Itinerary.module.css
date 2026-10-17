@@ -1,0 +1,189 @@
+/* 
+  Itinerary-specific warm botanical theme
+  Scoped via CSS module — applied on the ItineraryView root div
+*/
+
+/* ── Full-page warm beige background ────────────────────────────── */
+.itineraryPage {
+  background: #EDE0CE;
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+}
+
+/* ── Botanical leaf decoration — top-right corner ───────────────── */
+.botanicalTopRight {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 320px;
+  height: 320px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.18;
+}
+
+/* ── Botanical leaf decoration — bottom-left corner ─────────────── */
+.botanicalBottomLeft {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 280px;
+  height: 280px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.14;
+}
+
+/* ── Botanical leaf decoration — mid-left ───────────────────────── */
+.botanicalMidLeft {
+  position: fixed;
+  top: 40%;
+  left: -20px;
+  width: 180px;
+  height: 300px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.10;
+}
+
+/* ── Botanical leaf decoration — mid-right ──────────────────────── */
+.botanicalMidRight {
+  position: fixed;
+  top: 55%;
+  right: -20px;
+  width: 180px;
+  height: 300px;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.10;
+}
+
+/* ── Content sits above decorations ─────────────────────────────── */
+.itineraryContent {
+  position: relative;
+  z-index: 1;
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 2.5rem 1.5rem 3.5rem;
+}
+
+/* ── Cards: warm cream ───────────────────────────────────────────── */
+.itineraryPage .tp-card {
+  background: #FAF4EA !important;
+  border: 1px solid rgba(139, 109, 56, 0.12) !important;
+  box-shadow: 0 4px 16px rgba(139, 109, 56, 0.07) !important;
+}
+
+.itineraryPage .tp-card:hover {
+  transform: translateY(-3px) !important;
+  box-shadow: 0 10px 28px rgba(139, 109, 56, 0.12) !important;
+}
+
+/* ── Headings: deep earthy green ─────────────────────────────────── */
+.itineraryPage h1,
+.itineraryPage h2,
+.itineraryPage h3 {
+  color: #2C4A2E !important;
+}
+
+.itineraryPage .eyebrow {
+  color: #7A6840 !important;
+}
+
+/* ── Primary buttons: earthy terracotta (keep original energy) ───── */
+/* leave btn-primary terracotta so it pops on beige */
+
+/* ── Section nav: sticky with beige glass ────────────────────────── */
+.itineraryPage .sticky {
+  background: rgba(237, 224, 206, 0.94) !important;
+  backdrop-filter: blur(12px) !important;
+  border-color: rgba(139, 109, 56, 0.1) !important;
+}
+
+/* Active nav pill: earthy green */
+.itineraryPage .sticky button[class*="bg-[#0D5C75]"],
+.itineraryPage .sticky button[class*="bg-\\[\\#0D5C75\\]"] {
+  background: #4A6741 !important;
+  color: #fff !important;
+}
+
+/* ── Destination / hotel badges ──────────────────────────────────── */
+.itineraryPage span[class*="bg-[#0D5C75]"] {
+  background: rgba(74, 103, 65, 0.12) !important;
+  color: #3D5A35 !important;
+}
+
+/* ── Cost badge: warm amber ──────────────────────────────────────── */
+.itineraryPage span[class*="bg-[#E76F51]"] {
+  background: rgba(195, 140, 80, 0.14) !important;
+  color: #9A6B2A !important;
+}
+
+/* ── Timeline vertical line ──────────────────────────────────────── */
+.itineraryPage .timeline-line {
+  background: linear-gradient(180deg, #8B7355, rgba(139, 115, 85, 0.1)) !important;
+}
+
+/* ── Price / accent text ─────────────────────────────────────────── */
+.itineraryPage [class*="text-[#0D5C75]"] {
+  color: #4A6741 !important;
+}
+
+/* ── Selected ring ───────────────────────────────────────────────── */
+.itineraryPage [class*="ring-[#0D5C75]"] {
+  --tw-ring-color: #4A6741 !important;
+}
+
+/* ── Hover bg pill ───────────────────────────────────────────────── */
+.itineraryPage [class*="hover:bg-slate-100"]:hover {
+  background: rgba(139, 109, 56, 0.06) !important;
+}
+
+/* ── Muted text stays readable on beige ─────────────────────────── */
+.itineraryPage [class*="text-slate-600"] { color: #5C4A2A !important; }
+.itineraryPage [class*="text-slate-500"] { color: #7A6040 !important; }
+.itineraryPage [class*="text-slate-400"] { color: #9A8060 !important; }
+.itineraryPage [class*="text-slate-300"] { color: #C4AE90 !important; }
+
+/* ── Inline bg chips (amenities etc.) ───────────────────────────── */
+.itineraryPage [class*="bg-slate-100"] {
+  background: rgba(139, 109, 56, 0.08) !important;
+  color: #5C4A2A !important;
+}
+
+/* ── Input fields ────────────────────────────────────────────────── */
+.itineraryPage input,
+.itineraryPage textarea,
+.itineraryPage select {
+  background: #FAF4EA !important;
+  border-color: rgba(139, 109, 56, 0.18) !important;
+  color: #2C3A1E !important;
+}
+.itineraryPage input:focus,
+.itineraryPage textarea:focus,
+.itineraryPage select:focus {
+  border-color: #4A6741 !important;
+  box-shadow: 0 0 0 3px rgba(74, 103, 65, 0.1) !important;
+}
+
+/* ── Map container: no extra border on beige ─────────────────────── */
+.itineraryPage .tp-card:has([data-testid="itinerary-map"]) {
+  border-color: rgba(139, 109, 56, 0.08) !important;
+}
+
+/* ── Skeleton on beige ───────────────────────────────────────────── */
+.itineraryPage .skeleton {
+  background: linear-gradient(90deg, #E5D5BC 0%, #F0E4D0 40%, #E5D5BC 80%) !important;
+}
+
+/* ── Check mark circles (selected hotel/flight) ──────────────────── */
+.itineraryPage [class*="bg-[#0D5C75]"][class*="text-white"] {
+  background: #4A6741 !important;
+}
+
+/* ── Star fill ───────────────────────────────────────────────────── */
+.itineraryPage [class*="fill-[#E76F51]"] {
+  color: #C89040 !important;
+  fill: #C89040 !important;
+}
