@@ -55,6 +55,8 @@ import {
   getWeatherAdvisory,
   isDisruptiveWeather,
 } from "@/lib/weatherService";
+import { getMealPrices, inferHotelStars } from "@/lib/foodPricing";
+import { getLandmarkPrice, getSlotActivityPrice } from "@/lib/activityPricing";
 
 const SECTIONS = [
   { id: "overview", label: "Overview", icon: Compass },
@@ -690,8 +692,10 @@ function ItineraryView({
                 onDragOver={handleDragOver}
                 onDrop={handleDrop}
                 isPreview={isPreview}
+                hotel={localIt.hotels?.[selectedHotel] || localIt.hotels?.[0]}
+                currency={localIt.estimated_total_cost}
               />
-            ))}}
+            ))}
           </div>
         </div>
       </section>
@@ -910,7 +914,10 @@ function ItineraryView({
           </h2>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-            {localIt.landmarks.map((l, i) => (
+            {localIt.landmarks.map((l, i) => {
+              const stay = localIt.hotels?.[selectedHotel] || localIt.hotels?.[0];
+              const priced = getLandmarkPrice(l, stay, localIt.estimated_total_cost);
+              return (
               <motion.div
                 key={i}
                 initial={{ opacity: 0, y: 16 }}
@@ -934,8 +941,16 @@ function ItineraryView({
                 </div>
 
                 <div className="p-5">
-                  <div className="font-display text-xl">
-                    {l.name}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="font-display text-xl">
+                      {l.name}
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <div className={`font-semibold ${priced.free ? "text-emerald-600" : "text-[#0D5C75]"}`}>
+                        {priced.display}
+                      </div>
+                      <div className="text-[10px] text-slate-400">per person</div>
+                    </div>
                   </div>
 
                   <div className="text-slate-500 text-sm">
@@ -945,9 +960,15 @@ function ItineraryView({
                   <p className="text-sm text-slate-600 mt-2">
                     {l.description}
                   </p>
+                  {stay?.name && (
+                    <p className="text-xs text-slate-400 mt-2">
+                      Estimated for {inferHotelStars(stay)}-star stay · {stay.name}
+                    </p>
+                  )}
                 </div>
               </motion.div>
-            ))}
+              );
+            })}
           </div>
         </section>
       )}
@@ -1098,6 +1119,8 @@ function DayCard({
   onDragOver,
   onDrop,
   isPreview,
+  hotel,
+  currency,
 }) {
   const [editing, setEditing] = useState(null);
   const [draft, setDraft] = useState("");
@@ -1483,6 +1506,9 @@ useEffect(() => {
                 ["evening", Moon],
               ].map(([slot, Icon]) => {
                 const hasActivity = day[slot]?.activity;
+                const activityPrice = hasActivity
+                  ? getSlotActivityPrice(day[slot], hotel, currency)
+                  : null;
                 return (
                   <div
                     key={slot}
@@ -1563,6 +1589,18 @@ useEffect(() => {
                               ? day[slot].activity
                               : "No activity planned"}
                           </p>
+                          {activityPrice?.display && (
+                            <div className="shrink-0 text-right">
+                              <div
+                                className={`text-sm font-semibold ${
+                                  activityPrice.free ? "text-emerald-600" : "text-[#0D5C75]"
+                                }`}
+                              >
+                                {activityPrice.display}
+                              </div>
+                              <div className="text-[10px] text-slate-400">per person</div>
+                            </div>
+                          )}
 
                           {canEdit && hasActivity && (
                             <div className="flex items-center gap-1.5 shrink-0">
@@ -1631,28 +1669,45 @@ useEffect(() => {
             </div>
 
             <div className="tp-card p-5 bg-[#FDFBF7] border-slate-100 shadow-none">
-              <div className="flex items-center gap-2 text-[#E76F51] font-semibold">
-                <Utensils size={16} />
-                Food today
+              <div className="flex items-center justify-between gap-2 text-[#E76F51] font-semibold">
+                <div className="flex items-center gap-2">
+                  <Utensils size={16} />
+                  Food today
+                </div>
+                {hotel?.name && (
+                  <span className="text-[10px] uppercase tracking-widest text-slate-400 font-medium">
+                    {inferHotelStars(hotel)}-star dining
+                  </span>
+                )}
               </div>
 
               <div className="mt-3 space-y-3 text-sm">
-                {[
-                  "breakfast",
-                  "lunch",
-                  "dinner",
-                ].map((m) => (
-                  <div key={m}>
-                    <div className="eyebrow text-slate-500">
-                      {m}
+                {getMealPrices(day.food, hotel, currency).map((m) => (
+                  <div key={m.meal} className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="eyebrow text-slate-500">
+                        {m.meal}
+                      </div>
+                      <div className="text-slate-700 mt-0.5">
+                        {m.dish || "—"}
+                      </div>
                     </div>
-
-                    <div className="text-slate-700 mt-0.5">
-                      {day.food?.[m] || "—"}
-                    </div>
+                    {m.display && (
+                      <div className="shrink-0 font-semibold text-[#0D5C75]">
+                        {m.display}
+                        <div className="text-[10px] font-normal text-slate-400 text-right">
+                          per person
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
+              {hotel?.name && (
+                <p className="text-xs text-slate-400 mt-3">
+                  Estimated for {hotel.name} — breakfast is lighter, dinner is the main meal.
+                </p>
+              )}
 
              <SmartImage
   imageQuery={

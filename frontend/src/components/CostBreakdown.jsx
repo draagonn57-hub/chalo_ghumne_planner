@@ -9,6 +9,8 @@ import {
   TrendingUp,
   Info,
 } from "lucide-react";
+import { getMealPrices, inferHotelStars } from "@/lib/foodPricing";
+import { collectActivityCosts } from "@/lib/activityPricing";
 
 const CURRENCY_RE = /([A-Za-z]{0,3})\s*([\d,]+(?:\.\d+)?)/;
 
@@ -19,8 +21,6 @@ const CATEGORY_META = {
   activities: { label: "Activities & Sightseeing", icon: MapPin, color: "#2A9D8F" },
   other: { label: "Other & Tips", icon: Wallet, color: "#8B5E83" },
 };
-
-const MEAL_EST = { budget: 300, "mid-range": 800, luxury: 2500 };
 
 function parseAmount(str) {
   if (!str) return 0;
@@ -57,7 +57,9 @@ function buildBreakdown(it, selectedHotelIndex = 0, selectedFlightIndex = 0) {
   const durationDays = it.days?.length || 0;
   const prefs = it.preferences || {};
   const numTravelers = getNumTravelers(prefs.companions);
-  const perMeal = MEAL_EST[prefs.budget] || 800;
+  const allHotels = it.hotels || [];
+  const selectedHotel = allHotels[selectedHotelIndex] || allHotels[0];
+  const hotelStars = inferHotelStars(selectedHotel);
 
   const data = {
     flights: 0,
@@ -104,7 +106,6 @@ function buildBreakdown(it, selectedHotelIndex = 0, selectedFlightIndex = 0) {
 
   // Only count the selected hotel (by index), not all hotels
   const nights = Math.max(1, durationDays - 1);
-  const allHotels = it.hotels || [];
   if (allHotels.length > 0) {
     const h = allHotels[selectedHotelIndex] || allHotels[0];
     const perNight = parseAmount(h.price_per_night);
@@ -121,26 +122,31 @@ function buildBreakdown(it, selectedHotelIndex = 0, selectedFlightIndex = 0) {
 
   (it.days || []).forEach((day) => {
     if (!day.food) return;
-    const meals = ["breakfast", "lunch", "dinner"];
-    const knownCount = meals.filter((m) => day.food[m] && day.food[m] !== "—").length;
-    if (knownCount > 0) {
-      const dayFood = perMeal * knownCount * numTravelers;
-      data.food += dayFood;
+    const priced = getMealPrices(day.food, selectedHotel, currency).filter((m) => m.amount > 0);
+    priced.forEach((m) => {
+      const amount = m.amount * numTravelers;
+      data.food += amount;
       data.items.food.push({
-        label: `Day ${day.day} — ${day.location || "dining"}`,
-        amount: dayFood,
-        detail: `${numTravelers} traveler${numTravelers > 1 ? "s" : ""} × ${knownCount} meals`,
+        label: `Day ${day.day} ${m.meal} — ${m.dish}`,
+        amount,
+        detail:
+          numTravelers > 1
+            ? `${m.display} × ${numTravelers} travelers · ${hotelStars}-star dining`
+            : `${hotelStars}-star hotel dining`,
       });
-    }
+    });
   });
 
-  (it.landmarks || []).forEach((l) => {
-    const amt = 200 * numTravelers;
-    data.activities += amt;
+  collectActivityCosts(it, selectedHotel, currency).forEach((item) => {
+    const amount = item.amount * numTravelers;
+    data.activities += amount;
     data.items.activities.push({
-      label: l.name,
-      amount: amt,
-      detail: l.location || "",
+      label: item.label,
+      amount,
+      detail:
+        numTravelers > 1
+          ? `${item.display} × ${numTravelers} travelers · ${hotelStars}-star experience`
+          : `${hotelStars}-star experience${item.detail ? ` · ${item.detail}` : ""}`,
     });
   });
 
@@ -427,7 +433,7 @@ export default function CostBreakdown({ itinerary, selectedHotelIndex = 0, selec
       </div>
 
       <p className="text-xs text-slate-400 text-center">
-        All amounts are estimates based on AI-generated itinerary data. Actual prices may vary.
+        Food and sightseeing prices follow the selected hotel’s star level — street snacks and free walks stay cheaper; 5-star dining, guides, and adventure tickets cost more. Actual bills may vary.
       </p>
     </div>
   );
