@@ -90,6 +90,12 @@ html, body, #root {
   transform: translateY(-4px);
   box-shadow: 0 18px 40px -10px rgba(13, 92, 117, 0.14);
 }
+.tp-card.compare-selected {
+  box-shadow: 0 0 0 2px var(--tp-primary), 0 18px 40px -10px rgba(13, 92, 117, 0.22);
+}
+.tp-card.compare-selected:hover {
+  box-shadow: 0 0 0 2px var(--tp-primary), 0 18px 40px -10px rgba(13, 92, 117, 0.22);
+}
 
 /* Wizard choice card */
 .choice-card {
@@ -131,6 +137,11 @@ button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible
   outline: none;
   box-shadow: 0 0 0 3px rgba(231, 111, 81, 0.35);
   border-radius: 8px;
+}
+
+button[role="checkbox"]:focus-visible {
+  border-radius: 9999px !important;
+  box-shadow: 0 0 0 3px rgba(13, 92, 117, 0.45) !important;
 }
 
 /* Skeleton shimmer */

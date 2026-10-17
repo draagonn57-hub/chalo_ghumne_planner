@@ -7,7 +7,12 @@ import logging
 import os
 import re
 import time
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+from dotenv import load_dotenv
+
+ROOT_DIR = Path(__file__).parent
+load_dotenv(ROOT_DIR / ".env")
 
 logger = logging.getLogger(__name__)
 
@@ -580,6 +585,7 @@ def _extract_json(text: str) -> str:
 def _call(
     prompt: str,
     system_prompt: str,
+    temperature: float = 0.8,
 ) -> Dict[str, Any]:
     """
     Send a request to Gemini and return parsed JSON.
@@ -597,7 +603,7 @@ def _call(
                 contents=prompt,
                 config={
                     "system_instruction": system_prompt,
-                    "temperature": 0.8,
+                    "temperature": temperature,
                     "response_mime_type": "application/json",
                 },
             )
@@ -972,6 +978,221 @@ Return ONLY valid JSON with schema:
         raise ValueError("Could not find four distinct new destinations matching your preferences.")
 
     return {"suggestions": validated_suggestions[:4]}
+
+
+# ============================================================
+# DESTINATION COMPARISON
+# ============================================================
+
+COMPARE_SYSTEM_PROMPT = """You are a travel decision expert. You get 2–4 destinations and the user's profile (budget, interests, group type, trip duration, travel dates, departure city). Compare ONLY the given destinations on:
+1. Estimated total budget (flights + stay + food + activities) vs the user's budget
+2. Match with the user's interests
+3. Best-season fit and weather for the user's travel dates
+4. Famous places and must-do experiences
+5. Travel time and connectivity from the departure city
+6. Safety and ease of travel for the user's group type
+7. Crowd level and overall value for money
+Score each criterion 1–10 per destination, weight the criteria by the user's stated priorities, and pick ONE winner. Do not invent prices or facts. If a figure is uncertain, give a range and label it an estimate. Respond ONLY with valid JSON:
+{
+  "winner": "string",
+  "winner_reason": "string (max 2 sentences)",
+  "criteria": [ { "name": "string", "scores": { "<place>": number }, "notes": { "<place>": "string (max 12 words)" } } ],
+  "overall_scores": { "<place>": number },
+  "why_not_others": { "<place>": "string (max 1 sentence)" }
+}"""
+
+
+def _canon_place_name(name: Any, names_lower: Dict[str, str]) -> Optional[str]:
+    if not isinstance(name, str):
+        return None
+    raw = name.strip().lower()
+    if not raw:
+        return None
+    # 1. Direct exact match
+    if raw in names_lower:
+        return names_lower[raw]
+
+    # 2. Strip parentheses, e.g. "Rishikesh (India)" -> "Rishikesh"
+    stripped = re.sub(r"\(.*?\)", "", raw).strip()
+    if stripped in names_lower:
+        return names_lower[stripped]
+
+    # 3. Strip comma, e.g. "Rishikesh, India" -> "Rishikesh"
+    comma_part = raw.split(",")[0].strip()
+    if comma_part in names_lower:
+        return names_lower[comma_part]
+
+    # 4. Check if any destination name matches or is contained
+    for key, canon in names_lower.items():
+        if key == raw or key in raw or raw in key:
+            return canon
+
+    return None
+
+
+def validate_compare_result(
+    data: Dict[str, Any],
+    place_names: List[str],
+) -> Dict[str, Any]:
+    """
+    Validate and normalise the compare JSON. Raises ValueError if unusable.
+    Always returns exactly one winner from place_names (never a tie).
+    """
+    if not isinstance(data, dict):
+        raise ValueError("Compare response must be a JSON object.")
+
+    place_names = [str(n).strip() for n in place_names if str(n).strip()]
+    if len(place_names) < 2:
+        raise ValueError("Need at least two places to compare.")
+
+    names_lower = {n.lower(): n for n in place_names}
+
+    def map_score_dict(raw: Any) -> Dict[str, float]:
+        if not isinstance(raw, dict):
+            return {}
+        mapped: Dict[str, float] = {}
+        for key, value in raw.items():
+            place = _canon_place_name(key, names_lower)
+            if not place:
+                continue
+            try:
+                mapped[place] = float(value)
+            except (TypeError, ValueError):
+                continue
+        return mapped
+
+    criteria_out = []
+    raw_criteria = data.get("criteria")
+    if not isinstance(raw_criteria, list):
+        raise ValueError("Compare response is missing criteria.")
+
+    for row in raw_criteria:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name") or "").strip()
+        if not name:
+            continue
+        scores = map_score_dict(row.get("scores"))
+        if len(scores) < 2:
+            continue
+        notes_raw = row.get("notes") if isinstance(row.get("notes"), dict) else {}
+        notes = {}
+        for key, value in notes_raw.items():
+            place = _canon_place_name(key, names_lower)
+            if place and isinstance(value, str) and value.strip():
+                notes[place] = value.strip()
+        criteria_out.append({
+            "name": name,
+            "scores": scores,
+            "notes": notes,
+        })
+
+    if not criteria_out:
+        raise ValueError("Compare response has no valid criteria rows.")
+
+    overall = map_score_dict(data.get("overall_scores"))
+    if len(overall) < len(place_names):
+        averages: Dict[str, List[float]] = {n: [] for n in place_names}
+        for row in criteria_out:
+            for place, score in row["scores"].items():
+                averages.setdefault(place, []).append(score)
+        for place in place_names:
+            if place not in overall and averages.get(place):
+                vals = averages[place]
+                overall[place] = round(sum(vals) / len(vals), 1)
+
+    max_score = max((overall.get(n, -1) for n in place_names), default=-1)
+    top_scorers = [n for n in place_names if overall.get(n, -1) == max_score]
+
+    winner = _canon_place_name(data.get("winner"), names_lower)
+    if not winner or winner not in top_scorers:
+        winner = top_scorers[0] if top_scorers else place_names[0]
+
+    winner_reason = data.get("winner_reason")
+    if not isinstance(winner_reason, str) or not winner_reason.strip():
+        raise ValueError("Compare response is missing winner_reason.")
+    winner_reason = winner_reason.strip()
+
+    why_raw = data.get("why_not_others") if isinstance(data.get("why_not_others"), dict) else {}
+    why_not_others: Dict[str, str] = {}
+    for place in place_names:
+        if place == winner:
+            continue
+        note = why_raw.get(place)
+        if not isinstance(note, str) or not note.strip():
+            # try case-insensitive key
+            mapped_note = None
+            for key, value in why_raw.items():
+                if _canon_place_name(key, names_lower) == place and isinstance(value, str):
+                    mapped_note = value.strip()
+                    break
+            note = mapped_note or f"{place} is a strong option, but {winner} fits this trip a little better."
+        else:
+            note = note.strip()
+        why_not_others[place] = note
+
+    return {
+        "winner": winner,
+        "winner_reason": winner_reason,
+        "criteria": criteria_out,
+        "overall_scores": {n: overall.get(n, 0) for n in place_names},
+        "why_not_others": why_not_others,
+    }
+
+
+async def compare_destinations(
+    prefs: Dict[str, Any],
+    destinations: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Compare 2–4 destinations against the user's questionnaire profile."""
+    cleaned = []
+    seen = []
+    for item in destinations or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        if not name or is_duplicate_destination(name, seen):
+            continue
+        cleaned.append({
+            "name": name,
+            "country": str(item.get("country") or "").strip(),
+            "why": str(item.get("why") or "").strip(),
+        })
+        seen.append(name)
+
+    if len(cleaned) < 2 or len(cleaned) > 4:
+        raise ValueError("Compare requires between 2 and 4 destinations.")
+
+    dest_lines = []
+    names_exact = [d["name"] for d in cleaned]
+    for d in cleaned:
+        extra = []
+        if d["country"]:
+            extra.append(f"Country: {d['country']}")
+        if d["why"]:
+            extra.append(f"Context: {d['why']}")
+        extra_str = f" [{', '.join(extra)}]" if extra else ""
+        dest_lines.append(f"- \"{d['name']}\"{extra_str}")
+
+    travel_month = prefs.get("start_date") or "Not specified"
+    origin = prefs.get("origin") or "Not specified"
+
+    prompt = f"""
+User profile:
+{_preference_text(prefs)}
+Travel dates / month: {travel_month}
+Departure city: {origin}
+
+Destinations to compare (ONLY these — do not introduce others):
+{chr(10).join(dest_lines)}
+
+Pick exactly ONE winner. Never a tie.
+IMPORTANT: In the JSON output, the keys in "scores", "notes", "overall_scores", "why_not_others", and the value for "winner" MUST match the exact destination names: {json.dumps(names_exact)}. Do NOT append country names or parentheses to the keys.
+Return ONLY the required JSON.
+""".strip()
+
+    data = _call(prompt, COMPARE_SYSTEM_PROMPT, temperature=0.35)
+    return validate_compare_result(data, [d["name"] for d in cleaned])
 
 
 # ============================================================

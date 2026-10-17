@@ -24,7 +24,7 @@ from auth import (
     require_admin,
 )
 
-from ai_service import generate_itinerary, generate_suggestions, generate_activity_replacement, generate_assistant_reply, generate_refined_itinerary, generate_similar_destinations, generate_trains
+from ai_service import generate_itinerary, generate_suggestions, generate_activity_replacement, generate_assistant_reply, generate_refined_itinerary, generate_similar_destinations, generate_trains, compare_destinations
 from seed import seed_all
 
 
@@ -84,20 +84,20 @@ class ProfileUpdate(BaseModel):
 # ------------------------------------------------------------
 
 class QuestionnaireIn(BaseModel):
-    diet: str
+    diet: str = "veg"
     # veg | non-veg
 
-    budget: str
+    budget: str = "mid-range"
     # budget | mid-range | luxury
 
     travel_type: str = ""
     # domestic | international
 
-    duration_days: int
+    duration_days: int = 5
 
-    interests: List[str]
+    interests: List[str] = Field(default_factory=list)
 
-    companions: str
+    companions: str = "solo"
     # solo | couple | family | friends
 
     origin: Optional[str] = None
@@ -164,6 +164,11 @@ class DestinationChoice(BaseModel):
 class DetailGenerateIn(BaseModel):
     preferences: QuestionnaireIn
     destination: DestinationChoice
+
+
+class CompareIn(BaseModel):
+    preferences: QuestionnaireIn
+    destinations: List[DestinationChoice]
 
 
 # ------------------------------------------------------------
@@ -756,6 +761,65 @@ async def generate_detail(
         "preferences": prefs,
         "itinerary": result,
     }
+
+
+# ============================================================
+# COMPARE DESTINATIONS
+# ============================================================
+
+@api.post("/itinerary/compare")
+async def compare(
+    body: CompareIn,
+    user=Depends(get_current_user),
+):
+    destinations = body.destinations or []
+    count = len(destinations)
+    if count < 2 or count > 4:
+        raise HTTPException(
+            status_code=400,
+            detail="Select between 2 and 4 places to compare.",
+        )
+
+    names = [d.name.strip() for d in destinations if d.name and d.name.strip()]
+    if len(set(n.lower() for n in names)) != count:
+        raise HTTPException(
+            status_code=400,
+            detail="Each compared place must be distinct.",
+        )
+
+    prefs = body.preferences.model_dump()
+
+    try:
+        result = await compare_destinations(
+            prefs,
+            [d.model_dump() for d in destinations],
+        )
+    except ValueError as e:
+        logger.exception("Compare validation failed")
+        raise HTTPException(
+            status_code=502,
+            detail=str(e)[:200] or "Could not compare those places. Please try again.",
+        )
+    except Exception as e:
+        logger.exception("Compare generation failed")
+        err_msg = str(e).lower()
+        if (
+            "429" in err_msg
+            or "quota" in err_msg
+            or "resource_exhausted" in err_msg
+            or "rate limit" in err_msg
+            or "rate_limit" in err_msg
+        ):
+            raise HTTPException(
+                status_code=429,
+                detail="We couldn't compare those places right now. Please try again in a little while.",
+            )
+        raise HTTPException(
+            status_code=502,
+            detail="Could not compare those places. Please try again.",
+        )
+
+    return result
 
 
 # ============================================================
