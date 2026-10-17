@@ -24,7 +24,7 @@ from auth import (
     require_admin,
 )
 
-from ai_service import generate_itinerary, generate_suggestions, generate_activity_replacement, generate_assistant_reply, generate_refined_itinerary, generate_similar_destinations
+from ai_service import generate_itinerary, generate_suggestions, generate_activity_replacement, generate_assistant_reply, generate_refined_itinerary, generate_similar_destinations, generate_trains
 from seed import seed_all
 
 
@@ -627,6 +627,17 @@ async def generate_for_place(
             detail=f"AI generation failed: {str(e)[:200]}",
         )
 
+    # Inject train options for India-domestic journeys if AI didn't include them
+    if not result.get("trains"):
+        origin = prefs.get("origin", "")
+        dest_country = destination.get("country", "")
+        result["trains"] = await generate_trains(
+            origin=origin,
+            destination_name=destination.get("name", ""),
+            destination_country=dest_country,
+            budget=prefs.get("budget", "mid-range"),
+        )
+
     return {
         "preferences": prefs,
         "itinerary": result,
@@ -718,6 +729,17 @@ async def generate_detail(
                 "AI generation failed: "
                 f"{str(e)[:200]}"
             ),
+        )
+
+    # Inject train options for India-domestic journeys if AI didn't include them
+    if not result.get("trains"):
+        origin = prefs.get("origin", "")
+        dest_country = destination.get("country", "")
+        result["trains"] = await generate_trains(
+            origin=origin,
+            destination_name=destination.get("name", ""),
+            destination_country=dest_country,
+            budget=prefs.get("budget", "mid-range"),
         )
 
     return {

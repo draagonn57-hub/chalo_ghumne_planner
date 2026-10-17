@@ -1132,9 +1132,127 @@ Return ONLY the required JSON.
         DETAIL_PROMPT,
     )
 
+
 # ============================================================
-# ACTIVITY REPLACEMENT (WEATHER-AWARE)
+# TRAIN GENERATION — DEDICATED FUNCTION
+# A short, focused prompt so even gemini-flash-lite returns it.
+# Called after generate_itinerary() when trains[] is missing/empty
+# and the journey is India-domestic.
 # ============================================================
+
+TRAIN_PROMPT = """
+You are an Indian Railways travel expert.
+
+Return ONLY valid JSON. Do NOT return markdown or explanations.
+
+Required schema:
+
+{
+    "trains": [
+        {
+            "name": "string",
+            "number": "string",
+            "from_station": "string",
+            "to_station": "string",
+            "departure_time": "string",
+            "arrival_time": "string",
+            "duration": "string",
+            "classes": [
+                { "name": "string", "price": "string" }
+            ],
+            "stops": "string",
+            "estimated": true,
+            "disclaimer": "Estimated schedule and fare. Not a confirmed booking. Verify at IRCTC."
+        }
+    ]
+}
+
+Rules:
+- Return 2 to 4 realistic Indian train options for the given route.
+- Use real train names and realistic train numbers that actually serve this route.
+- Classes to include based on distance:
+  Short (<300 km): 2S, CC, 3A
+  Medium (300-800 km): SL, 3A, 2A
+  Long (>800 km): SL, 3A, 2A, 1A
+- Prices must be realistic IRCTC fare estimates in Indian Rupees (₹).
+- If no reliable train serves this route, return an empty trains array [].
+- Always set estimated: true.
+- Do NOT fabricate guaranteed availability.
+- Return ONLY valid JSON.
+"""
+
+
+def _is_india_domestic(origin: str, destination_country: str) -> bool:
+    """Return True only when both origin and destination are reliably within India."""
+    if not origin or not destination_country:
+        return False
+    india_keywords = {"india", "in", "भारत"}
+    dest_lower = destination_country.lower().strip()
+    if dest_lower not in india_keywords:
+        return False
+    # Treat origin as Indian if it doesn't look like a foreign country name.
+    # We use a simple heuristic: if origin contains a known non-Indian country, skip.
+    non_india = {
+        "usa", "us", "united states", "uk", "united kingdom", "australia",
+        "canada", "germany", "france", "japan", "china", "singapore",
+        "dubai", "uae", "malaysia", "thailand", "nepal", "pakistan",
+        "bangladesh", "sri lanka", "italy", "spain", "portugal", "brazil",
+        "mexico", "south africa", "new zealand", "indonesia", "vietnam",
+    }
+    origin_lower = origin.lower().strip()
+    for foreign in non_india:
+        if foreign in origin_lower:
+            return False
+    return True
+
+
+async def generate_trains(
+    origin: str,
+    destination_name: str,
+    destination_country: str,
+    budget: str = "mid-range",
+) -> List[Dict[str, Any]]:
+    """
+    Generate Indian train options for a domestic route.
+    Returns a list of train dicts (may be empty if no trains serve the route).
+    """
+    if not _is_india_domestic(origin, destination_country):
+        return []
+
+    prompt = f"""
+Generate Indian train options for this domestic route:
+
+Origin: {origin}
+Destination: {destination_name}, {destination_country}
+Traveler budget: {budget}
+
+Provide 2-4 realistic train options with estimated fares.
+If no direct train serves this route, suggest the most practical
+connecting option or return an empty array.
+
+Return ONLY the required JSON.
+"""
+    try:
+        data = _call(prompt, TRAIN_PROMPT)
+        trains = data.get("trains", [])
+        if not isinstance(trains, list):
+            return []
+        # Basic validation
+        valid = []
+        for t in trains:
+            if isinstance(t, dict) and t.get("name") and t.get("from_station"):
+                if "estimated" not in t:
+                    t["estimated"] = True
+                if "disclaimer" not in t:
+                    t["disclaimer"] = (
+                        "Estimated schedule and fare. "
+                        "Not a confirmed booking. Verify at IRCTC."
+                    )
+                valid.append(t)
+        return valid
+    except Exception as exc:
+        logger.warning("Train generation failed (non-fatal): %s", exc)
+        return []
 
 ACTIVITY_REPLACE_PROMPT = """
 You are an expert AI travel planner adjusting a single activity
