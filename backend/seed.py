@@ -58,9 +58,16 @@ async def seed_all(db):
             "password_hash": hash_password(ADMIN_PASSWORD),
             "role": "admin",
             "avatar": None,
+            "authProvider": "local",
             "preferences": {},
             "created_at": datetime.now(timezone.utc).isoformat(),
         })
+
+    try:
+        await db.users.create_index("googleId", unique=True, sparse=True)
+        await db.users.create_index("email", unique=True)
+    except Exception:
+        pass
 
     # Destinations
     if await db.destinations.count_documents({}) == 0:

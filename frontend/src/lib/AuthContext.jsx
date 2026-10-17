@@ -28,6 +28,15 @@ export function AuthProvider({ children }) {
     setUser(data.user);
     return data.user;
   };
+  const loginWithGoogle = async (credential) => {
+    const { data } = await api.post("/auth/google", {
+      credential,
+      token: credential,
+    });
+    localStorage.setItem("tp_token", data.token);
+    setUser(data.user);
+    return data;
+  };
   const logout = () => {
     localStorage.removeItem("tp_token");
     setUser(null);
@@ -39,7 +48,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthCtx.Provider value={{ user, loading, login, signup, logout, refresh, setUser }}>
+    <AuthCtx.Provider value={{ user, loading, login, signup, loginWithGoogle, logout, refresh, setUser }}>
       {children}
     </AuthCtx.Provider>
   );
