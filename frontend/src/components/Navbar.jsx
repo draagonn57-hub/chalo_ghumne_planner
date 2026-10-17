@@ -44,11 +44,12 @@ export default function Navbar() {
   const navLink = (to, label, testId) => (
     <Link
       to={to}
-      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+      className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors relative ${
         isActive(to)
-          ? "bg-[#0D5C75]/10 text-[#0D5C75]"
+          ? "bg-[#0D5C75]/10 text-[#0D5C75] font-semibold after:absolute after:bottom-0 after:left-3 after:right-3 after:h-0.5 after:rounded-full after:bg-[#E76F51]"
           : "text-slate-600 hover:bg-slate-100"
       }`}
+      aria-current={isActive(to) ? "page" : undefined}
       data-testid={testId}
     >
       {label}

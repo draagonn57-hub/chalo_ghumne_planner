@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useLang } from "@/lib/LangContext";
 import { useAuth } from "@/lib/AuthContext";
-import { Sparkles, MapPinned, Wand2, ArrowRight, Star } from "lucide-react";
+import { Sparkles, MapPinned, Wand2, ArrowRight, Star, Compass } from "lucide-react";
 import DynamicBackground from "@/components/DynamicBackground";
 
 export default function Landing() {
@@ -32,19 +32,27 @@ export default function Landing() {
           <div className="max-w-3xl animate-fade-up">
             <p className="eyebrow text-white/80" data-testid="hero-eyebrow">AI-crafted travel · Since 2026</p>
             <h1 className="font-display mt-4 text-5xl sm:text-7xl leading-[1.02] tracking-tight" data-testid="hero-title">
-              Journeys designed by <em className="not-italic text-[#F2B48A]">intelligence,</em> told with soul.
+              Journeys designed by <em className="not-italic text-[#E76F51]/80">intelligence,</em> told with soul.
             </h1>
             <p className="mt-6 text-lg sm:text-xl text-white/85 max-w-2xl">{t("hero_sub")}</p>
             <div className="mt-10 flex flex-wrap gap-4">
               <button onClick={startPlanning} className="btn-primary flex items-center gap-2 text-base" data-testid="hero-plan-btn">
                 <Sparkles size={18} /> {t("plan_my_trip")}
               </button>
-              <Link to="/destinations" className="btn-secondary bg-white/10 border-white/40 text-white hover:bg-white/15" data-testid="hero-explore-btn">
+              {/* Issue 4 fix: stronger semi-transparent fill + thicker border for visibility */}
+              {/* Issue 5 fix: added Compass icon to match other CTAs */}
+              <Link
+                to="/destinations"
+                className="btn-secondary bg-white/20 border-2 border-white/70 text-white hover:bg-white/30 flex items-center gap-2"
+                data-testid="hero-explore-btn"
+              >
+                <Compass size={16} />
                 Explore destinations
               </Link>
             </div>
 
-            <div className="mt-14 flex items-center gap-6 text-sm text-white/80">
+            {/* Issue 6 fix: increased top margin from mt-14 → mt-20 for breathing room */}
+            <div className="mt-20 flex items-center gap-6 text-sm text-white/80">
               <div className="flex items-center gap-2"><Star size={16} className="fill-[#F2B48A] text-[#F2B48A]" /> 4.9 avg on 12k trips</div>
               <div className="hidden sm:block w-px h-4 bg-white/30" />
               <div className="hidden sm:flex items-center gap-2"><MapPinned size={16} /> 180+ destinations</div>
@@ -99,7 +107,7 @@ export default function Landing() {
               <div className="p-6">
                 <div className="flex items-center justify-between">
                   <h3 className="font-display text-2xl">{d.name}</h3>
-                  <span className="text-xs uppercase tracking-widest text-[#E76F51] font-semibold">{d.type}</span>
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-[#E76F51]/10 text-[#E76F51] font-semibold uppercase tracking-wide">{d.type}</span>
                 </div>
                 <p className="text-sm text-slate-500 mt-1">{d.country}</p>
                 <p className="text-slate-600 mt-4 text-sm line-clamp-2">{d.description}</p>

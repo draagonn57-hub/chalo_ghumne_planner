@@ -37,7 +37,7 @@ export default function Destinations() {
                   <h3 className="font-display text-2xl">{d.name}</h3>
                   <div className="text-sm text-slate-500 flex items-center gap-1 mt-0.5"><MapPin size={12} />{d.country}</div>
                 </div>
-                <span className="text-xs uppercase tracking-widest text-[#E76F51] font-semibold">{d.type}</span>
+                <span className="text-xs px-2.5 py-1 rounded-full bg-[#E76F51]/10 text-[#E76F51] font-semibold uppercase tracking-wide">{d.type}</span>
               </div>
               <p className="text-slate-600 mt-4 text-sm leading-relaxed">{d.description}</p>
               <div className="flex flex-wrap gap-1.5 mt-4">

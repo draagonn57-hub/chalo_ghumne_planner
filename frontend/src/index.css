@@ -12,6 +12,7 @@
   --tp-surface: #FFFFFF;
   --tp-text: #1A2530;
   --tp-muted: #64748B;
+  --tp-muted-light: #94A3B8;  /* replaces ad-hoc slate-400 / text-white/80 equivalents */
   --tp-border: #E2E8F0;
 }
 
@@ -35,8 +36,8 @@ html, body, #root {
 
 .eyebrow {
   font-family: 'Manrope', sans-serif;
-  font-size: 0.72rem;
-  letter-spacing: 0.22em;
+  font-size: 0.75rem;   /* was 0.72rem (~11.5px) → now 12px — fix #2 */
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--tp-muted);
   font-weight: 600;
