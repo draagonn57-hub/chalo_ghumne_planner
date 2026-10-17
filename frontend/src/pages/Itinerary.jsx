@@ -17,6 +17,7 @@ import {
   MapPin,
   BedDouble,
   Plane,
+  Train,
   Printer,
   Pencil,
   Trash2,
@@ -65,6 +66,7 @@ const SECTIONS = [
   { id: "daily", label: "Daily Plan", icon: Calendar },
   { id: "hotels", label: "Hotels", icon: Building2 },
   { id: "flights", label: "Flights", icon: Plane },
+  { id: "trains", label: "Trains", icon: Train },
   { id: "landmarks", label: "Landmarks", icon: Landmark },
   { id: "cost", label: "Cost", icon: Wallet },
   { id: "tips", label: "Tips", icon: Lightbulb },
@@ -72,10 +74,23 @@ const SECTIONS = [
 
 const TRANS_ICON = {
   flight: Plane,
-  train: Plane,
+  train: Train,
   car: Plane,
   bus: Plane,
 };
+
+/**
+ * Returns true only when every destination is within India.
+ * Safe default: returns false if destinations are missing or ambiguous.
+ */
+function isIndiaDomestic(itinerary) {
+  const destinations = itinerary?.destinations || [];
+  if (destinations.length === 0) return false;
+  return destinations.every((d) => {
+    const country = (d?.country || "").toLowerCase().trim();
+    return country === "india" || country === "in" || country === "भारत";
+  });
+}
 
 export function ItineraryPreview() {
   const nav = useNavigate();
@@ -270,6 +285,9 @@ function ItineraryView({
   const [localIt, setLocalIt] = useState(it);
   const [selectedHotel, setSelectedHotel] = useState(0);
   const [selectedFlight, setSelectedFlight] = useState(0);
+  // Train selection — null means no train chosen (flight is used instead)
+  const [selectedTrain, setSelectedTrain] = useState(null);
+  const [selectedTrainClass, setSelectedTrainClass] = useState({}); // { [trainIdx]: classIdx }
   const [showRefine, setShowRefine] = useState(false);
   const [refining, setRefining] = useState(false);
   const [dragData, setDragData] = useState(null);
@@ -419,12 +437,15 @@ function ItineraryView({
 
   if (!localIt) return null;
 
+  const showTrains = isIndiaDomestic(localIt) && (localIt.trains?.length > 0);
+
   const visibleSections = SECTIONS.filter((s) => {
     if (s.id === "overview") return true;
     if (s.id === "map") return true;
     if (s.id === "daily") return localIt.days?.length > 0;
     if (s.id === "hotels") return localIt.hotels?.length > 0;
     if (s.id === "flights") return localIt.flights?.length > 0 || localIt.transport?.length > 0;
+    if (s.id === "trains") return showTrains;
     if (s.id === "landmarks") return localIt.landmarks?.length > 0;
     if (s.id === "cost") return true;
     if (s.id === "tips") return localIt.tips?.length > 0;
@@ -947,6 +968,143 @@ function ItineraryView({
         </section>
       )}
 
+      {/* ── Train Travel (India domestic only) ──────────────────── */}
+      {showTrains && (
+        <section
+          ref={(el) => (sectionRefs.current.trains = el)}
+          className="mt-14 scroll-mt-32"
+          data-testid="itinerary-trains-section"
+        >
+          <div className="flex items-end justify-between gap-4 flex-wrap">
+            <div>
+              <p className="eyebrow">Indian Railways</p>
+              <h2 className="font-display text-3xl sm:text-4xl mt-2">
+                Train options
+              </h2>
+            </div>
+            <p className="text-xs text-slate-400 hidden sm:block max-w-xs text-right">
+              Estimated only. Book at{" "}
+              <a href="https://www.irctc.co.in" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">irctc.co.in</a>
+            </p>
+          </div>
+
+          {/* Disclaimer */}
+          <div className="mt-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-amber-800 text-xs leading-relaxed">
+            <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
+            <span>
+              Schedules, fares, and availability are <strong>AI-generated estimates</strong> and may not reflect current IRCTC data.
+              Always verify and book on the official{" "}
+              <a href="https://www.irctc.co.in" target="_blank" rel="noopener noreferrer" className="underline font-semibold">IRCTC website</a>.
+            </span>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-5 mt-8">
+            {localIt.trains.map((tr, i) => {
+              const isSelected = selectedTrain === i;
+              const chosenClassIdx = selectedTrainClass[i] ?? 0;
+              const chosenClass = tr.classes?.[chosenClassIdx];
+              return (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 12 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.3, delay: i * 0.06 }}
+                  className={`tp-card p-5 relative flex flex-col gap-4 ${isSelected ? "ring-2 ring-[#0D5C75]" : ""}`}
+                  data-testid={`itinerary-train-${i}`}
+                >
+                  {isSelected && (
+                    <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-[#0D5C75] text-white flex items-center justify-center shadow">
+                      <Check size={14} />
+                    </div>
+                  )}
+
+                  {/* Header */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-11 h-11 rounded-full bg-[#0D5C75]/10 text-[#0D5C75] flex items-center justify-center shrink-0">
+                      <Train size={20} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-base leading-tight">{tr.name}</div>
+                      <div className="text-xs text-slate-400 font-mono mt-0.5">#{tr.number}</div>
+                    </div>
+                    {chosenClass && (
+                      <div className="shrink-0 text-right">
+                        <div className="text-[#0D5C75] font-bold text-lg">{chosenClass.price}</div>
+                        <div className="text-xs text-slate-400">per person · est.</div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Route */}
+                  <div className="flex items-center gap-2 text-sm">
+                    <div className="flex-1 text-center">
+                      <div className="font-semibold text-base">{tr.departure_time}</div>
+                      <div className="text-slate-500 text-xs mt-0.5 line-clamp-1">{tr.from_station}</div>
+                    </div>
+                    <div className="flex flex-col items-center gap-0.5 px-2 shrink-0">
+                      <div className="text-[10px] text-slate-400">{tr.duration}</div>
+                      <div className="flex items-center gap-1">
+                        <div className="w-2 h-2 rounded-full border-2 border-[#0D5C75]" />
+                        <div className="w-14 h-0.5 bg-slate-200" />
+                        <div className="w-2 h-2 rounded-full bg-[#0D5C75]" />
+                      </div>
+                      {tr.stops && <div className="text-[10px] text-slate-400">{tr.stops}</div>}
+                    </div>
+                    <div className="flex-1 text-center">
+                      <div className="font-semibold text-base">{tr.arrival_time}</div>
+                      <div className="text-slate-500 text-xs mt-0.5 line-clamp-1">{tr.to_station}</div>
+                    </div>
+                  </div>
+
+                  {/* Class selector */}
+                  {tr.classes?.length > 0 && (
+                    <div>
+                      <div className="text-xs text-slate-500 mb-2 font-medium">Travel class (estimated fare)</div>
+                      <div className="flex flex-wrap gap-2">
+                        {tr.classes.map((cls, ci) => (
+                          <button
+                            key={ci}
+                            onClick={() => setSelectedTrainClass((prev) => ({ ...prev, [i]: ci }))}
+                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                              chosenClassIdx === ci
+                                ? "bg-[#0D5C75] text-white border-[#0D5C75]"
+                                : "border-slate-200 text-slate-600 hover:border-[#0D5C75]/40 hover:text-[#0D5C75]"
+                            }`}
+                            data-testid={`train-${i}-class-${ci}`}
+                          >
+                            {cls.name}{cls.price ? ` · ${cls.price}` : ""}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Select / Deselect */}
+                  {selectedTrain !== i ? (
+                    <button
+                      onClick={() => setSelectedTrain(i)}
+                      className="mt-auto text-sm font-medium px-4 py-2 rounded-full border border-[#0D5C75]/20 text-[#0D5C75] hover:bg-[#0D5C75]/5 transition-colors"
+                      data-testid={`select-train-${i}`}
+                    >
+                      Select this train
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setSelectedTrain(null)}
+                      className="mt-auto text-sm font-medium px-4 py-2 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+                      data-testid={`deselect-train-${i}`}
+                    >
+                      ✕ Deselect
+                    </button>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
       {/* Landmarks */}
       {localIt.landmarks?.length > 0 && (
         <section
@@ -1031,7 +1189,13 @@ function ItineraryView({
           A detailed breakdown of your estimated trip costs — flights, stays, food, activities, and more.
         </p>
         <div className="mt-8">
-          <CostBreakdown itinerary={localIt} selectedHotelIndex={selectedHotel} selectedFlightIndex={selectedFlight} />
+          <CostBreakdown
+            itinerary={localIt}
+            selectedHotelIndex={selectedHotel}
+            selectedFlightIndex={selectedFlight}
+            selectedTrainIndex={selectedTrain}
+            selectedTrainClassIndex={selectedTrain !== null ? (selectedTrainClass[selectedTrain] ?? 0) : 0}
+          />
         </div>
       </section>
 

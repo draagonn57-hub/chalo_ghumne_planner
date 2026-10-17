@@ -152,6 +152,27 @@ REQUIRED JSON SCHEMA
         }
     ],
 
+    "trains": [
+        {
+            "name": "string",
+            "number": "string",
+            "from_station": "string",
+            "to_station": "string",
+            "departure_time": "string",
+            "arrival_time": "string",
+            "duration": "string",
+            "classes": [
+                {
+                    "name": "string",
+                    "price": "string"
+                }
+            ],
+            "stops": "string",
+            "estimated": true,
+            "disclaimer": "Estimated schedule and fare. Not a confirmed booking. Verify at IRCTC."
+        }
+    ],
+
     "days": [
         {
             "day": 1,
@@ -225,6 +246,34 @@ CORE ITINERARY RULES
 - Provide 2-4 estimated flight options when flights are relevant.
 - If the user prefers train, bus, or car, reflect that preference
   instead of forcing flights.
+
+============================================================
+TRAIN OPTIONS — INDIA DOMESTIC JOURNEYS ONLY
+============================================================
+
+- If AND ONLY IF the origin and the selected destination are BOTH
+  within India (i.e., the complete journey is domestic Indian travel),
+  generate 2–4 Indian train options in the "trains" array.
+- Determine domestic eligibility based on the origin city/state AND
+  the destination country field — if destination country is "India"
+  and origin is an Indian city/state, trains are eligible.
+- For international journeys (origin or destination outside India),
+  set "trains" to an empty array [].
+- If the origin is not specified or cannot be reliably determined as
+  Indian, set "trains" to an empty array [].
+- Use plausible, realistic train names and numbers that serve the
+  actual route (e.g. Rajdhani Express, Shatabdi Express, Duronto,
+  Jan Shatabdi, Garib Rath as appropriate for the route).
+- Do NOT invent specific seat availability or guarantee ticket
+  availability — always set estimated: true and include the
+  standard disclaimer.
+- Include realistic class options for the route:
+  long-distance overnight routes: SL, 3A, 2A, 1A;
+  day/express routes: CC, 2S, 3A;
+  short routes: 2S, CC.
+- Fares must be realistic estimates aligned with the user's budget tier.
+- If a reliable train connection does not exist for the route, omit
+  trains or return an empty array rather than fabricating one.
 
 
 ============================================================
@@ -1258,7 +1307,7 @@ The user wants to adjust their current trip — NOT create a new one.
 Rules:
 - Return ONLY valid JSON in the exact same schema as the input itinerary.
 - Keep the same number of days and destinations.
-- Keep the same JSON structure: title, summary, destinations, days, hotels, flights, transport, landmarks, tips, estimated_total_cost.
+- Keep the same JSON structure: title, summary, destinations, days, hotels, flights, trains, transport, landmarks, tips, estimated_total_cost.
 - Each day has: day, title, location, morning {activity, landmark}, afternoon {activity, landmark}, evening {activity, landmark}, food {breakfast, lunch, dinner, image_query}.
 - Apply the user's requested refinements while keeping the trip coherent.
 - If asked for cheaper options, swap expensive hotels/activities for budget alternatives and update estimated_total_cost.
