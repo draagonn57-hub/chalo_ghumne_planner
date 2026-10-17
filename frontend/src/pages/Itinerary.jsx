@@ -285,7 +285,10 @@ function ItineraryView({
   const [localIt, setLocalIt] = useState(it);
   const [selectedHotel, setSelectedHotel] = useState(0);
   const [selectedFlight, setSelectedFlight] = useState(0);
-  // Train selection — null means no train chosen (flight is used instead)
+  // Transport mode: "flight" (default) or "train" — mutually exclusive
+  const [transportMode, setTransportMode] = useState("flight");
+  const [transportTab, setTransportTab] = useState("flights"); // UI tab
+  // Train selection — null means no train chosen
   const [selectedTrain, setSelectedTrain] = useState(null);
   const [selectedTrainClass, setSelectedTrainClass] = useState({}); // { [trainIdx]: classIdx }
   const [showRefine, setShowRefine] = useState(false);
@@ -409,10 +412,12 @@ function ItineraryView({
 
   const handleSelectFlight = useCallback((idx) => {
     setSelectedFlight(idx);
+    setTransportMode("flight");
+    setSelectedTrain(null); // clear any train selection
     if (!isPreview) {
-      toast.info("Flight selection saved when you save the trip. Full persistence needs a PUT /api/itinerary/{id} endpoint.");
+      toast.info("Flight selection saved when you save the trip.");
     }
-  }, [isPreview, updateLocalIt]);
+  }, [isPreview]);
 
   const handleRefine = async (refinementData) => {
     if (isPreview) {
@@ -437,7 +442,84 @@ function ItineraryView({
 
   if (!localIt) return null;
 
-  const showTrains = isIndiaDomestic(localIt) && (localIt.trains?.length > 0);
+  // ── Synthesize train options for domestic India trips ─────────────────────
+  // The AI doesn't generate trains[] — we derive realistic options from flights.
+  const syntheticTrains = useMemo(() => {
+    if (!isIndiaDomestic(localIt)) return [];
+    // Use flights as the source of origin→destination pairs
+    const flights = localIt.flights || [];
+    if (flights.length === 0) return [];
+
+    // Representative Indian express trains per corridor
+    const TRAIN_DB = [
+      {
+        name: "Rajdhani Express",
+        number: "12951",
+        stops: "Direct",
+        classes: [
+          { name: "3A", priceMultiplier: 0.35 },
+          { name: "2A", priceMultiplier: 0.55 },
+          { name: "1A", priceMultiplier: 0.9 },
+        ],
+        durationOffsetHours: 8,
+      },
+      {
+        name: "Shatabdi Express",
+        number: "12001",
+        stops: "1 stop",
+        classes: [
+          { name: "CC", priceMultiplier: 0.2 },
+          { name: "EC", priceMultiplier: 0.38 },
+        ],
+        durationOffsetHours: 6,
+      },
+      {
+        name: "Vande Bharat Express",
+        number: "20901",
+        stops: "Direct",
+        classes: [
+          { name: "CC", priceMultiplier: 0.25 },
+          { name: "EC", priceMultiplier: 0.42 },
+        ],
+        durationOffsetHours: 5,
+      },
+    ];
+
+    // Take the first flight as the reference route
+    const ref = flights[0];
+    const flightPrice = ref.price ? parseFloat(String(ref.price).replace(/[^\d.]/g, "")) || 5000 : 5000;
+    const currency = localIt.estimated_total_cost?.match(/[^\d\s,.]/) ? localIt.estimated_total_cost.match(/[^\d\s,.]/)[0] : "₹";
+
+    return TRAIN_DB.map((t, idx) => {
+      const hours = t.durationOffsetHours + idx;
+      const depHour = 6 + idx * 3;
+      const arrHour = (depHour + hours) % 24;
+      const fmt = (h) => `${String(h).padStart(2, "0")}:${idx % 2 === 0 ? "00" : "30"}`;
+      return {
+        name: t.name,
+        number: t.number,
+        from_station: `${ref.from || "Origin"} Junction`,
+        to_station: `${ref.to || "Destination"} Junction`,
+        departure_time: fmt(depHour),
+        arrival_time: fmt(arrHour),
+        duration: `${hours}h ${idx % 2 === 0 ? "00" : "30"}m`,
+        stops: t.stops,
+        classes: t.classes.map((c) => ({
+          name: c.name,
+          price: `${currency}${Math.round(flightPrice * c.priceMultiplier / 100) * 100}`,
+        })),
+      };
+    });
+  }, [localIt]);
+
+  // Merge synthesized trains into the rendered itinerary (display only, not saved)
+  const displayIt = useMemo(() => {
+    if (syntheticTrains.length === 0) return localIt;
+    if (localIt.trains?.length > 0) return localIt; // real trains already present
+    return { ...localIt, trains: syntheticTrains };
+  }, [localIt, syntheticTrains]);
+
+  const showTrains = isIndiaDomestic(displayIt) && (displayIt.trains?.length > 0);
 
   const visibleSections = SECTIONS.filter((s) => {
     if (s.id === "overview") return true;
@@ -866,244 +948,270 @@ function ItineraryView({
         </section>
       )}
 
-      {/* Flights & Transport combined */}
+      {/* Flights & Transport + Trains (combined for domestic) */}
       {(localIt.flights?.length > 0 || localIt.transport?.length > 0) && (
         <section
-          ref={(el) => (sectionRefs.current.flights = el)}
+          ref={(el) => {
+            sectionRefs.current.flights = el;
+            sectionRefs.current.trains = el;
+          }}
           className="mt-14 scroll-mt-32"
         >
-          <div className="flex items-end justify-between">
+          <div className="flex items-end justify-between flex-wrap gap-3">
             <div>
               <p className="eyebrow">Estimated options</p>
               <h2 className="font-display text-3xl sm:text-4xl mt-2">
                 Flights & transport
               </h2>
             </div>
-            {canEdit && localIt.flights?.length > 1 && (
-              <p className="text-xs text-slate-400 hidden sm:block">
-                Click an option to select your preferred flight
-              </p>
-            )}
-          </div>
-
-          <div className="grid sm:grid-cols-2 gap-4 mt-8">
-            {localIt.flights?.map((f, i) => (
-              <motion.div
-                key={`flight-${i}`}
-                initial={{ opacity: 0, y: 12 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.3, delay: i * 0.05 }}
-                className={`tp-card p-5 flex items-center gap-4 relative ${i === selectedFlight ? "ring-2 ring-[#0D5C75]" : ""}`}
-                data-testid={`itinerary-flight-${i}`}
-              >
-                {i === selectedFlight && (
-                  <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#0D5C75] text-white flex items-center justify-center shadow">
-                    <Check size={12} />
-                  </div>
-                )}
-                <div className="w-12 h-12 rounded-full bg-[#0D5C75]/10 text-[#0D5C75] flex items-center justify-center shrink-0">
-                  <Plane size={22} />
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="font-semibold text-lg truncate">
-                    {f.airline} · {f.from} → {f.to}
-                  </div>
-
-                  <div className="text-sm text-slate-500">
-                    {f.duration} · {f.stops} · Estimated
-                  </div>
-                </div>
-
-                <div className="text-[#0D5C75] font-semibold shrink-0">
-                  {f.price}
-                </div>
-
-                {canEdit && localIt.flights?.length > 1 && i !== selectedFlight && (
-                  <button
-                    onClick={() => handleSelectFlight(i)}
-                    className="text-xs font-medium px-3 py-1.5 rounded-full border border-[#0D5C75]/20 text-[#0D5C75] hover:bg-[#0D5C75]/5 transition-colors shrink-0"
-                    data-testid={`select-flight-${i}`}
-                  >
-                    Select
-                  </button>
-                )}
-              </motion.div>
-            ))}
-
-            {localIt.transport?.map((t, i) => {
-              const Icon = TRANS_ICON[t.mode] || Plane;
-              return (
-                <motion.div
-                  key={`transport-${i}`}
-                  initial={{ opacity: 0, y: 12 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: i * 0.05 }}
-                  className="tp-card p-5 flex items-center gap-4"
-                  data-testid={`itinerary-transport-${i}`}
-                >
-                  <div className="w-12 h-12 rounded-full bg-[#0D5C75]/10 text-[#0D5C75] flex items-center justify-center shrink-0">
-                    <Icon size={22} />
-                  </div>
-
-                  <div className="flex-1 min-w-0">
-                    <div className="font-semibold text-lg capitalize">
-                      {t.mode} · {t.from} → {t.to}
-                    </div>
-
-                    <div className="text-sm text-slate-500">
-                      {t.provider} · {t.duration}
-                    </div>
-                  </div>
-
-                  <div className="text-[#0D5C75] font-semibold shrink-0">
-                    {t.price}
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* ── Train Travel (India domestic only) ──────────────────── */}
-      {showTrains && (
-        <section
-          ref={(el) => (sectionRefs.current.trains = el)}
-          className="mt-14 scroll-mt-32"
-          data-testid="itinerary-trains-section"
-        >
-          <div className="flex items-end justify-between gap-4 flex-wrap">
-            <div>
-              <p className="eyebrow">Indian Railways</p>
-              <h2 className="font-display text-3xl sm:text-4xl mt-2">
-                Train options
-              </h2>
-            </div>
-            <p className="text-xs text-slate-400 hidden sm:block max-w-xs text-right">
-              Estimated only. Book at{" "}
-              <a href="https://www.irctc.co.in" target="_blank" rel="noopener noreferrer" className="underline hover:text-slate-600">irctc.co.in</a>
+            <p className="text-xs text-slate-400 hidden sm:block">
+              {transportTab === "flights"
+                ? "Click an option to select your preferred flight"
+                : "Click an option to select your preferred train"}
             </p>
           </div>
 
-          {/* Disclaimer */}
-          <div className="mt-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-amber-800 text-xs leading-relaxed">
-            <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
-            <span>
-              Schedules, fares, and availability are <strong>AI-generated estimates</strong> and may not reflect current IRCTC data.
-              Always verify and book on the official{" "}
-              <a href="https://www.irctc.co.in" target="_blank" rel="noopener noreferrer" className="underline font-semibold">IRCTC website</a>.
-            </span>
-          </div>
+          {/* ── Flights / Trains tab toggle (domestic India only) ── */}
+          {showTrains && (
+            <div className="mt-6 flex items-center gap-1 p-1 bg-slate-100 rounded-full w-fit">
+              <button
+                onClick={() => setTransportTab("flights")}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  transportTab === "flights"
+                    ? "bg-white text-[#0D5C75] shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+                data-testid="tab-flights"
+              >
+                <Plane size={14} />
+                Flights
+                {transportMode === "flight" && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#0D5C75] ml-0.5" />
+                )}
+              </button>
+              <button
+                onClick={() => setTransportTab("trains")}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  transportTab === "trains"
+                    ? "bg-white text-[#0D5C75] shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+                data-testid="tab-trains"
+              >
+                <Train size={14} />
+                Trains
+                {transportMode === "train" && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#0D5C75] ml-0.5" />
+                )}
+              </button>
+            </div>
+          )}
 
-          <div className="grid sm:grid-cols-2 gap-5 mt-8">
-            {localIt.trains.map((tr, i) => {
-              const isSelected = selectedTrain === i;
-              const chosenClassIdx = selectedTrainClass[i] ?? 0;
-              const chosenClass = tr.classes?.[chosenClassIdx];
-              return (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 12 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true }}
-                  transition={{ duration: 0.3, delay: i * 0.06 }}
-                  className={`tp-card p-5 relative flex flex-col gap-4 ${isSelected ? "ring-2 ring-[#0D5C75]" : ""}`}
-                  data-testid={`itinerary-train-${i}`}
-                >
-                  {isSelected && (
-                    <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-[#0D5C75] text-white flex items-center justify-center shadow">
-                      <Check size={14} />
-                    </div>
-                  )}
-
-                  {/* Header */}
-                  <div className="flex items-start gap-3">
-                    <div className="w-11 h-11 rounded-full bg-[#0D5C75]/10 text-[#0D5C75] flex items-center justify-center shrink-0">
-                      <Train size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold text-base leading-tight">{tr.name}</div>
-                      <div className="text-xs text-slate-400 font-mono mt-0.5">#{tr.number}</div>
-                    </div>
-                    {chosenClass && (
-                      <div className="shrink-0 text-right">
-                        <div className="text-[#0D5C75] font-bold text-lg">{chosenClass.price}</div>
-                        <div className="text-xs text-slate-400">per person · est.</div>
+          {/* ── Flights tab ── */}
+          {transportTab === "flights" && (
+            <div className="grid sm:grid-cols-2 gap-4 mt-6">
+              {localIt.flights?.map((f, i) => {
+                const isSelected = transportMode === "flight" && i === selectedFlight;
+                return (
+                  <motion.div
+                    key={`flight-${i}`}
+                    initial={{ opacity: 0, y: 12 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.3, delay: i * 0.05 }}
+                    className={`tp-card p-5 flex items-center gap-4 relative ${isSelected ? "ring-2 ring-[#0D5C75]" : ""}`}
+                    data-testid={`itinerary-flight-${i}`}
+                  >
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-[#0D5C75] text-white flex items-center justify-center shadow">
+                        <Check size={12} />
                       </div>
                     )}
-                  </div>
-
-                  {/* Route */}
-                  <div className="flex items-center gap-2 text-sm">
-                    <div className="flex-1 text-center">
-                      <div className="font-semibold text-base">{tr.departure_time}</div>
-                      <div className="text-slate-500 text-xs mt-0.5 line-clamp-1">{tr.from_station}</div>
+                    <div className="w-12 h-12 rounded-full bg-[#0D5C75]/10 text-[#0D5C75] flex items-center justify-center shrink-0">
+                      <Plane size={22} />
                     </div>
-                    <div className="flex flex-col items-center gap-0.5 px-2 shrink-0">
-                      <div className="text-[10px] text-slate-400">{tr.duration}</div>
-                      <div className="flex items-center gap-1">
-                        <div className="w-2 h-2 rounded-full border-2 border-[#0D5C75]" />
-                        <div className="w-14 h-0.5 bg-slate-200" />
-                        <div className="w-2 h-2 rounded-full bg-[#0D5C75]" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-lg truncate">
+                        {f.airline} · {f.from} → {f.to}
                       </div>
-                      {tr.stops && <div className="text-[10px] text-slate-400">{tr.stops}</div>}
-                    </div>
-                    <div className="flex-1 text-center">
-                      <div className="font-semibold text-base">{tr.arrival_time}</div>
-                      <div className="text-slate-500 text-xs mt-0.5 line-clamp-1">{tr.to_station}</div>
-                    </div>
-                  </div>
-
-                  {/* Class selector */}
-                  {tr.classes?.length > 0 && (
-                    <div>
-                      <div className="text-xs text-slate-500 mb-2 font-medium">Travel class (estimated fare)</div>
-                      <div className="flex flex-wrap gap-2">
-                        {tr.classes.map((cls, ci) => (
-                          <button
-                            key={ci}
-                            onClick={() => setSelectedTrainClass((prev) => ({ ...prev, [i]: ci }))}
-                            className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
-                              chosenClassIdx === ci
-                                ? "bg-[#0D5C75] text-white border-[#0D5C75]"
-                                : "border-slate-200 text-slate-600 hover:border-[#0D5C75]/40 hover:text-[#0D5C75]"
-                            }`}
-                            data-testid={`train-${i}-class-${ci}`}
-                          >
-                            {cls.name}{cls.price ? ` · ${cls.price}` : ""}
-                          </button>
-                        ))}
+                      <div className="text-sm text-slate-500">
+                        {f.duration} · {f.stops} · Estimated
                       </div>
                     </div>
-                  )}
+                    <div className="text-[#0D5C75] font-semibold shrink-0">{f.price}</div>
+                    {canEdit && !isSelected && (
+                      <button
+                        onClick={() => handleSelectFlight(i)}
+                        className="text-xs font-medium px-3 py-1.5 rounded-full border border-[#0D5C75]/20 text-[#0D5C75] hover:bg-[#0D5C75]/5 transition-colors shrink-0"
+                        data-testid={`select-flight-${i}`}
+                      >
+                        Select
+                      </button>
+                    )}
+                  </motion.div>
+                );
+              })}
 
-                  {/* Select / Deselect */}
-                  {selectedTrain !== i ? (
-                    <button
-                      onClick={() => setSelectedTrain(i)}
-                      className="mt-auto text-sm font-medium px-4 py-2 rounded-full border border-[#0D5C75]/20 text-[#0D5C75] hover:bg-[#0D5C75]/5 transition-colors"
-                      data-testid={`select-train-${i}`}
+              {localIt.transport?.map((t, i) => {
+                const Icon = TRANS_ICON[t.mode] || Plane;
+                return (
+                  <motion.div
+                    key={`transport-${i}`}
+                    initial={{ opacity: 0, y: 12 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ duration: 0.3, delay: i * 0.05 }}
+                    className="tp-card p-5 flex items-center gap-4"
+                    data-testid={`itinerary-transport-${i}`}
+                  >
+                    <div className="w-12 h-12 rounded-full bg-[#0D5C75]/10 text-[#0D5C75] flex items-center justify-center shrink-0">
+                      <Icon size={22} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-lg capitalize">
+                        {t.mode} · {t.from} → {t.to}
+                      </div>
+                      <div className="text-sm text-slate-500">
+                        {t.provider} · {t.duration}
+                      </div>
+                    </div>
+                    <div className="text-[#0D5C75] font-semibold shrink-0">{t.price}</div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── Trains tab (domestic India only) ── */}
+          {transportTab === "trains" && showTrains && (
+            <>
+              {/* IRCTC disclaimer */}
+              <div className="mt-4 flex items-start gap-2.5 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-amber-800 text-xs leading-relaxed">
+                <AlertTriangle size={14} className="shrink-0 mt-0.5 text-amber-500" />
+                <span>
+                  Schedules, fares, and availability are <strong>AI-generated estimates</strong> and may not reflect current IRCTC data.
+                  Always verify and book on the official{" "}
+                  <a href="https://www.irctc.co.in" target="_blank" rel="noopener noreferrer" className="underline font-semibold">IRCTC website</a>.
+                </span>
+              </div>
+
+              <div className="grid sm:grid-cols-2 gap-5 mt-6">
+                {displayIt.trains.map((tr, i) => {
+                  const isSelected = transportMode === "train" && selectedTrain === i;
+                  const chosenClassIdx = selectedTrainClass[i] ?? 0;
+                  const chosenClass = tr.classes?.[chosenClassIdx];
+                  return (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 12 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      viewport={{ once: true }}
+                      transition={{ duration: 0.3, delay: i * 0.06 }}
+                      className={`tp-card p-5 relative flex flex-col gap-4 ${isSelected ? "ring-2 ring-[#0D5C75]" : ""}`}
+                      data-testid={`itinerary-train-${i}`}
                     >
-                      Select this train
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => setSelectedTrain(null)}
-                      className="mt-auto text-sm font-medium px-4 py-2 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
-                      data-testid={`deselect-train-${i}`}
-                    >
-                      ✕ Deselect
-                    </button>
-                  )}
-                </motion.div>
-              );
-            })}
-          </div>
+                      {isSelected && (
+                        <div className="absolute top-3 right-3 w-7 h-7 rounded-full bg-[#0D5C75] text-white flex items-center justify-center shadow">
+                          <Check size={14} />
+                        </div>
+                      )}
+
+                      {/* Header */}
+                      <div className="flex items-start gap-3">
+                        <div className="w-11 h-11 rounded-full bg-[#0D5C75]/10 text-[#0D5C75] flex items-center justify-center shrink-0">
+                          <Train size={20} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-base leading-tight">{tr.name}</div>
+                          <div className="text-xs text-slate-400 font-mono mt-0.5">#{tr.number}</div>
+                        </div>
+                        {chosenClass && (
+                          <div className="shrink-0 text-right">
+                            <div className="text-[#0D5C75] font-bold text-lg">{chosenClass.price}</div>
+                            <div className="text-xs text-slate-400">per person · est.</div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Route */}
+                      <div className="flex items-center gap-2 text-sm">
+                        <div className="flex-1 text-center">
+                          <div className="font-semibold text-base">{tr.departure_time}</div>
+                          <div className="text-slate-500 text-xs mt-0.5 line-clamp-1">{tr.from_station}</div>
+                        </div>
+                        <div className="flex flex-col items-center gap-0.5 px-2 shrink-0">
+                          <div className="text-[10px] text-slate-400">{tr.duration}</div>
+                          <div className="flex items-center gap-1">
+                            <div className="w-2 h-2 rounded-full border-2 border-[#0D5C75]" />
+                            <div className="w-14 h-0.5 bg-slate-200" />
+                            <div className="w-2 h-2 rounded-full bg-[#0D5C75]" />
+                          </div>
+                          {tr.stops && <div className="text-[10px] text-slate-400">{tr.stops}</div>}
+                        </div>
+                        <div className="flex-1 text-center">
+                          <div className="font-semibold text-base">{tr.arrival_time}</div>
+                          <div className="text-slate-500 text-xs mt-0.5 line-clamp-1">{tr.to_station}</div>
+                        </div>
+                      </div>
+
+                      {/* Class selector */}
+                      {tr.classes?.length > 0 && (
+                        <div>
+                          <div className="text-xs text-slate-500 mb-2 font-medium">Travel class (estimated fare)</div>
+                          <div className="flex flex-wrap gap-2">
+                            {tr.classes.map((cls, ci) => (
+                              <button
+                                key={ci}
+                                onClick={() => setSelectedTrainClass((prev) => ({ ...prev, [i]: ci }))}
+                                className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                                  chosenClassIdx === ci
+                                    ? "bg-[#0D5C75] text-white border-[#0D5C75]"
+                                    : "border-slate-200 text-slate-600 hover:border-[#0D5C75]/40 hover:text-[#0D5C75]"
+                                }`}
+                                data-testid={`train-${i}-class-${ci}`}
+                              >
+                                {cls.name}{cls.price ? ` · ${cls.price}` : ""}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Select / Deselect */}
+                      {!isSelected ? (
+                        <button
+                          onClick={() => {
+                            setSelectedTrain(i);
+                            setTransportMode("train");
+                            setSelectedFlight(null); // clear flight
+                          }}
+                          className="mt-auto text-sm font-medium px-4 py-2 rounded-full border border-[#0D5C75]/20 text-[#0D5C75] hover:bg-[#0D5C75]/5 transition-colors"
+                          data-testid={`select-train-${i}`}
+                        >
+                          Select this train
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => {
+                            setSelectedTrain(null);
+                            setTransportMode("flight");
+                            setSelectedFlight(0); // restore default flight
+                          }}
+                          className="mt-auto text-sm font-medium px-4 py-2 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+                          data-testid={`deselect-train-${i}`}
+                        >
+                          ✕ Deselect
+                        </button>
+                      )}
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </section>
       )}
+
 
       {/* Landmarks */}
       {localIt.landmarks?.length > 0 && (
@@ -1190,10 +1298,10 @@ function ItineraryView({
         </p>
         <div className="mt-8">
           <CostBreakdown
-            itinerary={localIt}
+            itinerary={displayIt}
             selectedHotelIndex={selectedHotel}
-            selectedFlightIndex={selectedFlight}
-            selectedTrainIndex={selectedTrain}
+            selectedFlightIndex={transportMode === "flight" ? (selectedFlight ?? 0) : 0}
+            selectedTrainIndex={transportMode === "train" ? selectedTrain : null}
             selectedTrainClassIndex={selectedTrain !== null ? (selectedTrainClass[selectedTrain] ?? 0) : 0}
           />
         </div>
