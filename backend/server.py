@@ -631,12 +631,17 @@ async def generate_for_place(
     if not result.get("trains"):
         origin = prefs.get("origin", "")
         dest_country = destination.get("country", "")
+        logger.info(
+            f"[trains] generate-for-place: origin={origin!r}, "
+            f"dest_country={dest_country!r}"
+        )
         result["trains"] = await generate_trains(
             origin=origin,
             destination_name=destination.get("name", ""),
             destination_country=dest_country,
             budget=prefs.get("budget", "mid-range"),
         )
+        logger.info(f"[trains] injected {len(result['trains'])} train(s)")
 
     return {
         "preferences": prefs,
@@ -735,12 +740,17 @@ async def generate_detail(
     if not result.get("trains"):
         origin = prefs.get("origin", "")
         dest_country = destination.get("country", "")
+        logger.info(
+            f"[trains] generate-detail: origin={origin!r}, "
+            f"dest_country={dest_country!r}"
+        )
         result["trains"] = await generate_trains(
             origin=origin,
             destination_name=destination.get("name", ""),
             destination_country=dest_country,
             budget=prefs.get("budget", "mid-range"),
         )
+        logger.info(f"[trains] injected {len(result['trains'])} train(s)")
 
     return {
         "preferences": prefs,

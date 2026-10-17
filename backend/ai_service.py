@@ -1183,15 +1183,20 @@ Rules:
 
 
 def _is_india_domestic(origin: str, destination_country: str) -> bool:
-    """Return True only when both origin and destination are reliably within India."""
-    if not origin or not destination_country:
+    """Return True only when destination is India.
+    Origin check is a best-effort filter — if origin is empty or unrecognisably
+    Indian we still allow trains as long as destination is India.
+    """
+    if not destination_country:
         return False
     india_keywords = {"india", "in", "भारत"}
     dest_lower = destination_country.lower().strip()
     if dest_lower not in india_keywords:
         return False
-    # Treat origin as Indian if it doesn't look like a foreign country name.
-    # We use a simple heuristic: if origin contains a known non-Indian country, skip.
+    # If origin is empty/not provided, trust destination country alone.
+    if not origin or not origin.strip():
+        return True
+    # If origin explicitly looks like a non-Indian country, suppress trains.
     non_india = {
         "usa", "us", "united states", "uk", "united kingdom", "australia",
         "canada", "germany", "france", "japan", "china", "singapore",
