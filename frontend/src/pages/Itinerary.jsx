@@ -641,14 +641,13 @@ function ItineraryView({
           )}
 
           {onSave && (
-            <button
-              onClick={onSave}
-              className="btn-primary flex items-center gap-2"
-              data-testid="itinerary-save"
-            >
-              <Save size={16} />
-              Save trip
-            </button>
+            <button 
+  className="btn-primary flex items-center gap-2" 
+  onClick={() => onSave()}
+>
+  <Save size={16} />
+  Save trip
+</button>
           )}
 
           {onBook && (
