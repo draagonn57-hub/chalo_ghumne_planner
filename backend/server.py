@@ -3,6 +3,7 @@
 import os
 import asyncio
 import uuid
+import random
 import logging
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -28,7 +29,7 @@ from auth import (
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
-from email_service import send_booking_email
+from email_service import send_booking_email, send_otp_email
 
 from ai_service import (
     generate_itinerary,
@@ -76,13 +77,22 @@ class UserModel(BaseModel):
     password: Optional[str] = None
     password_hash: Optional[str] = None
     googleId: Optional[str] = Field(default=None, description="Google OAuth ID (unique, sparse)")
-    authProvider: str = Field(default="local", description="Auth provider: local | google")
+    authProvider: str = Field(default="local", description="Auth provider: local | google | email_otp")
     role: str = "user"
     avatar: Optional[str] = None
     preferences: Dict[str, Any] = Field(default_factory=dict)
     created_at: Optional[str] = None
 
 User = UserModel
+
+
+class OtpSendIn(BaseModel):
+    email: EmailStr
+
+
+class OtpVerifyIn(BaseModel):
+    email: EmailStr
+    code: str
 
 
 class SignupIn(BaseModel):
@@ -509,6 +519,150 @@ async def google_auth(body: GoogleAuthIn):
             "authProvider": "google",
             "role": "user",
             "avatar": picture,
+            "preferences": {},
+            "created_at": now_iso(),
+        }
+        await db.users.insert_one(user)
+
+    token = create_token(user["id"], user.get("role", "user"))
+
+    return {
+        "token": token,
+        "user": sanitize(user),
+    }
+
+
+@api.post("/auth/otp/send")
+@api.post("/auth/send-otp")
+async def send_otp(body: OtpSendIn):
+    """
+    Generate and send a 6-digit verification code to the user's email.
+    In local development (process.env.NODE_ENV === 'development'), logs the code
+    directly to the server terminal:
+      console.log("------------------------\n[DEV AUTH OTP]: " + code + "\n------------------------")
+    Does not require an external email provider to verify logins on localhost:3000.
+    Invalidates existing codes for the email. Code expires after 10 minutes.
+    """
+    email = body.email.lower().strip()
+    code = f"{random.randint(100000, 999999):06d}"
+
+    # Invalidate any previous unverified OTPs for this email
+    await db.email_otps.delete_many({"email": email})
+
+    # Code expires after 10 minutes
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+    await db.email_otps.insert_one({
+        "id": str(uuid.uuid4()),
+        "email": email,
+        "code": code,
+        "attempts": 0,
+        "expires_at": expires_at.isoformat(),
+        "verified": False,
+        "created_at": now_iso(),
+    })
+
+    # Development sandboxing:
+    # When generating the 6-digit OTP in development mode (process.env.NODE_ENV === 'development')
+    is_dev = (
+        os.environ.get("NODE_ENV") == "development"
+        or os.environ.get("ENV") in ("development", "dev", "test")
+        or os.environ.get("ENVIRONMENT") != "production"
+    )
+
+    if is_dev:
+        terminal_banner = f"------------------------\n[DEV AUTH OTP]: {code}\n------------------------"
+        print(terminal_banner, flush=True)
+        logger.info(terminal_banner)
+
+    # Do not require an external email provider to verify logins on localhost:3000
+    try:
+        asyncio.create_task(send_otp_email(email, code))
+    except Exception as e:
+        logger.warning(f"Background email send note: {e}")
+
+    resp = {
+        "success": True,
+        "message": f"Verification code sent to {email}",
+        "email": email,
+    }
+    if is_dev:
+        resp["dev_otp"] = code
+
+    return resp
+
+
+@api.post("/auth/otp/verify")
+@api.post("/auth/verify-otp")
+async def verify_otp(body: OtpVerifyIn):
+    """
+    Verify the 6-digit OTP code.
+    Invalidates the code after 10 minutes or 5 failed verification attempts.
+    On success, finds or creates the user in MongoDB and issues our session JWT token.
+    """
+    email = body.email.lower().strip()
+    code = body.code.strip()
+
+    otp_record = await db.email_otps.find_one({"email": email, "verified": False})
+    if not otp_record:
+        raise HTTPException(
+            status_code=400,
+            detail="No active verification code found for this email. Please request a new code.",
+        )
+
+    # Check expiration (10 minutes)
+    expires_at = datetime.fromisoformat(otp_record["expires_at"])
+    now_utc = datetime.now(timezone.utc)
+    if now_utc > expires_at:
+        await db.email_otps.delete_one({"_id": otp_record["_id"]})
+        raise HTTPException(
+            status_code=400,
+            detail="Verification code has expired (valid for 10 minutes). Please request a new code.",
+        )
+
+    # Check 5 failed verification attempts limit
+    attempts = otp_record.get("attempts", 0)
+    if attempts >= 5:
+        await db.email_otps.delete_one({"_id": otp_record["_id"]})
+        raise HTTPException(
+            status_code=400,
+            detail="Too many failed verification attempts. This code has been invalidated. Please request a new code.",
+        )
+
+    # Check code match
+    if otp_record["code"] != code:
+        new_attempts = attempts + 1
+        if new_attempts >= 5:
+            await db.email_otps.delete_one({"_id": otp_record["_id"]})
+            raise HTTPException(
+                status_code=400,
+                detail="Too many failed verification attempts. This code has been invalidated. Please request a new code.",
+            )
+        else:
+            await db.email_otps.update_one(
+                {"_id": otp_record["_id"]},
+                {"$set": {"attempts": new_attempts}},
+            )
+            remaining = 5 - new_attempts
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid verification code. {remaining} attempt{'s' if remaining != 1 else ''} remaining.",
+            )
+
+    # Successfully verified - invalidate the code
+    await db.email_otps.delete_one({"_id": otp_record["_id"]})
+
+    # Find or create user
+    user = await db.users.find_one({"email": email})
+    if not user:
+        name = email.split("@")[0].replace(".", " ").title()
+        user = {
+            "id": str(uuid.uuid4()),
+            "name": name,
+            "email": email,
+            "password_hash": None,
+            "authProvider": "email_otp",
+            "role": "user",
+            "avatar": None,
             "preferences": {},
             "created_at": now_iso(),
         }
@@ -2251,6 +2405,7 @@ async def on_startup():
         try:
             await db.users.create_index("googleId", unique=True, sparse=True)
             await db.users.create_index("email", unique=True)
+            await db.email_otps.create_index("email")
         except Exception as idx_err:
             logger.warning(f"Index creation note: {idx_err}")
 

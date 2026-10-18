@@ -122,14 +122,25 @@ export function GoogleSignInButton({ onResponse, text = "continue_with", disable
   );
 }
 
-export function Login() {
-  const { login, setUser } = useAuth();
-  const nav = useNavigate();
-  const loc = useLocation();
-  const next = new URLSearchParams(loc.search).get("next") || "/dashboard";
-  const [form, setForm] = useState({ email: "", password: "" });
+export function EmailOtpFlow({ mode = "login", onSuccess }) {
+  const { sendOtp, verifyOtp, setUser } = useAuth();
+  const [step, setStep] = useState("email"); // "email" | "otp"
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
   const [busy, setBusy] = useState(false);
   const [googleBusy, setGoogleBusy] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [countdown, setCountdown] = useState(45);
+  const [devOtp, setDevOtp] = useState(null);
+
+  // 45-second countdown timer for Step 2
+  useEffect(() => {
+    if (step !== "otp" || countdown <= 0) return;
+    const interval = setInterval(() => {
+      setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [step, countdown]);
 
   const handleGoogleSuccess = useCallback(
     async (response) => {
@@ -150,7 +161,7 @@ export function Login() {
         if (setUser) setUser(data.user);
 
         toast.success(`Welcome back, ${data.user?.name || "Traveler"}!`);
-        nav("/dashboard");
+        onSuccess?.(data.user);
       } catch (err) {
         console.error("Google login error:", err);
         toast.error(err?.response?.data?.detail || "Google sign-in failed");
@@ -158,177 +169,278 @@ export function Login() {
         setGoogleBusy(false);
       }
     },
-    [nav, setUser]
+    [onSuccess, setUser]
   );
 
-  const submit = async (e) => {
+  // Step 1: Send OTP to email
+  const handleSendOtp = async (e) => {
     e.preventDefault();
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) {
+      toast.error("Please enter a valid email address");
+      return;
+    }
+
     setBusy(true);
     try {
-      await login(form.email, form.password);
-      toast.success("Welcome back");
-      nav(next);
+      const data = await sendOtp(cleanEmail);
+      if (data?.dev_otp) {
+        setDevOtp(data.dev_otp);
+        console.log("------------------------\n[DEV AUTH OTP]: " + data.dev_otp + "\n------------------------");
+      }
+      setCountdown(45);
+      setStep("otp");
+      toast.success(data?.message || `Verification code sent to ${cleanEmail}`);
     } catch (err) {
-      toast.error(err?.response?.data?.detail || "Login failed");
-    } finally { setBusy(false); }
+      console.error("Send OTP error:", err);
+      toast.error(err?.response?.data?.detail || "Failed to send verification code");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // Step 2: Resend OTP
+  const handleResendOtp = async () => {
+    if (countdown > 0 || resending) return;
+    setResending(true);
+    try {
+      const data = await sendOtp(email.trim().toLowerCase());
+      if (data?.dev_otp) {
+        setDevOtp(data.dev_otp);
+        console.log("------------------------\n[DEV AUTH OTP]: " + data.dev_otp + "\n------------------------");
+      }
+      setCountdown(45);
+      toast.success("New verification code sent!");
+    } catch (err) {
+      console.error("Resend OTP error:", err);
+      toast.error(err?.response?.data?.detail || "Failed to resend code");
+    } finally {
+      setResending(false);
+    }
+  };
+
+  // Step 2: Verify OTP
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    const cleanOtp = otp.trim();
+    if (cleanOtp.length !== 6) {
+      toast.error("Please enter the 6-digit verification code");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const data = await verifyOtp(email.trim().toLowerCase(), cleanOtp);
+      toast.success(`Welcome, ${data.user?.name || "Traveler"}!`);
+      onSuccess?.(data.user);
+    } catch (err) {
+      console.error("Verify OTP error:", err);
+      toast.error(err?.response?.data?.detail || "Verification failed");
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
-    <AuthLayout title="Welcome back" subtitle="Sign in to continue planning your next journey.">
-      <GoogleSignInButton onResponse={handleGoogleSuccess} text="continue_with" disabled={googleBusy} />
+    <div className="w-full">
+      {step === "email" ? (
+        <>
+          <GoogleSignInButton
+            onResponse={handleGoogleSuccess}
+            text={mode === "signup" ? "signup_with" : "continue_with"}
+            disabled={googleBusy || busy}
+          />
 
-      <form onSubmit={submit} className="space-y-4" data-testid="login-form">
-        <Field label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} testid="login-email" />
-        <Field label="Password" type="password" value={form.password} onChange={(v) => setForm({ ...form, password: v })} testid="login-password" />
-        <button className="btn-primary w-full" disabled={busy || googleBusy} data-testid="login-submit">{busy ? "Signing in…" : "Sign in"}</button>
-        <div className="flex items-center justify-between text-sm pt-2">
-          <Link to="/forgot" className="text-[#0D5C75] hover:underline" data-testid="link-forgot">Forgot password?</Link>
-          <Link to="/signup" className="text-[#0D5C75] hover:underline" data-testid="link-signup">Create account</Link>
-        </div>
-      </form>
+          <form onSubmit={handleSendOtp} className="space-y-4" data-testid="login-form">
+            <label className="block">
+              <span className="text-xs uppercase tracking-widest text-slate-500 font-semibold">Email</span>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Enter your email"
+                required
+                autoFocus
+                disabled={busy || googleBusy}
+                data-testid="login-email"
+                className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:border-[#E76F51] focus:outline-none transition-colors text-slate-900 placeholder:text-slate-400"
+              />
+            </label>
+
+            <button
+              type="submit"
+              className="btn-primary w-full cursor-pointer flex items-center justify-center gap-2"
+              disabled={busy || googleBusy || !email.trim()}
+              data-testid="login-submit"
+            >
+              {busy ? "Sending code…" : "Continue with email"}
+            </button>
+          </form>
+        </>
+      ) : (
+        <form onSubmit={handleVerifyOtp} className="space-y-5" data-testid="otp-verify-form">
+          {/* Header with entered email and option to edit */}
+          <div className="flex items-center justify-between p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-sm">
+            <div className="truncate mr-3">
+              <span className="text-slate-500 text-xs block">Verification code sent to</span>
+              <span className="font-semibold text-slate-800 text-sm truncate block" data-testid="sent-email-display">
+                {email}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setStep("email");
+                setOtp("");
+              }}
+              className="text-xs font-semibold text-[#0D5C75] hover:text-[#0A485C] underline px-2 py-1 rounded transition-colors cursor-pointer flex-shrink-0"
+              data-testid="edit-email-btn"
+            >
+              Edit email
+            </button>
+          </div>
+
+          {/* 6-digit verification code input */}
+          <label className="block">
+            <div className="flex items-center justify-between">
+              <span className="text-xs uppercase tracking-widest text-slate-500 font-semibold">
+                6-Digit Verification Code
+              </span>
+              <span className="text-xs text-slate-400">Valid for 10 min</span>
+            </div>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              value={otp}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+                setOtp(val);
+              }}
+              placeholder="••••••"
+              required
+              autoFocus
+              disabled={busy}
+              data-testid="otp-input"
+              className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 bg-white text-center text-2xl font-mono tracking-[0.45em] focus:border-[#E76F51] focus:outline-none transition-colors text-slate-900 placeholder:text-slate-300"
+            />
+          </label>
+
+          {/* Verify button */}
+          <button
+            type="submit"
+            className="btn-primary w-full cursor-pointer flex items-center justify-center gap-2"
+            disabled={busy || otp.length !== 6}
+            data-testid="verify-otp-btn"
+          >
+            {busy ? "Verifying…" : "Verify"}
+          </button>
+
+          {/* 45-second resend countdown timer */}
+          <div className="flex items-center justify-between text-xs text-slate-500 pt-1">
+            <span>Didn't receive the code?</span>
+            {countdown > 0 ? (
+              <span className="font-medium text-slate-400" data-testid="countdown-timer">
+                Resend in {countdown}s
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={resending || busy}
+                className="font-semibold text-[#0D5C75] hover:underline cursor-pointer"
+                data-testid="resend-otp-btn"
+              >
+                {resending ? "Sending…" : "Resend code"}
+              </button>
+            )}
+          </div>
+
+          {/* Local Dev Sandbox indicator */}
+          {devOtp && (
+            <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900" data-testid="dev-otp-banner">
+              <div className="font-semibold text-amber-950">Local Dev Sandbox:</div>
+              <div className="mt-1 flex items-center justify-between gap-2">
+                <span>Code printed to server terminal:</span>
+                <button
+                  type="button"
+                  onClick={() => setOtp(devOtp)}
+                  className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-amber-300 text-amber-900 hover:bg-amber-100 cursor-pointer underline"
+                  title="Click to auto-fill code"
+                >
+                  {devOtp}
+                </button>
+              </div>
+            </div>
+          )}
+        </form>
+      )}
+    </div>
+  );
+}
+
+export function Login() {
+  const nav = useNavigate();
+  const loc = useLocation();
+  const next = new URLSearchParams(loc.search).get("next") || "/dashboard";
+
+  return (
+    <AuthLayout title="Welcome back" subtitle="Sign in to continue planning your next journey.">
+      <EmailOtpFlow mode="login" onSuccess={() => nav(next)} />
+      <div className="flex items-center justify-center text-sm pt-4 border-t border-slate-200/70 mt-6">
+        <span className="text-slate-500">Need an account? </span>
+        <Link to="/signup" className="text-[#0D5C75] font-semibold hover:underline ml-1" data-testid="link-signup">
+          Create account
+        </Link>
+      </div>
     </AuthLayout>
   );
 }
 
 export function Signup() {
-  const { signup, setUser } = useAuth();
   const nav = useNavigate();
-  const [form, setForm] = useState({ name: "", email: "", password: "" });
-  const [busy, setBusy] = useState(false);
-  const [googleBusy, setGoogleBusy] = useState(false);
-
-  const handleGoogleSuccess = useCallback(
-    async (response) => {
-      try {
-        setGoogleBusy(true);
-        const token = response?.credential || response?.token || response?.id_token;
-        if (!token) {
-          toast.error("Google sign-in did not return a credential");
-          return;
-        }
-
-        const { data } = await api.post("/auth/google", {
-          credential: token,
-          token: token,
-        });
-
-        localStorage.setItem("tp_token", data.token);
-        if (setUser) setUser(data.user);
-
-        toast.success(`Account ready! Welcome, ${data.user?.name || "Traveler"}!`);
-        nav("/dashboard");
-      } catch (err) {
-        console.error("Google signup error:", err);
-        toast.error(err?.response?.data?.detail || "Google signup failed");
-      } finally {
-        setGoogleBusy(false);
-      }
-    },
-    [nav, setUser]
-  );
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      await signup(form.name, form.email, form.password);
-      toast.success("Account created");
-      nav("/plan");
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || "Signup failed");
-    } finally { setBusy(false); }
-  };
 
   return (
-    <AuthLayout title="Begin your journey" subtitle="Create a free account to save trips and access your history.">
-      <GoogleSignInButton onResponse={handleGoogleSuccess} text="signup_with" disabled={googleBusy} />
-
-      <form onSubmit={submit} className="space-y-4" data-testid="signup-form">
-        <Field label="Name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} testid="signup-name" />
-        <Field label="Email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} testid="signup-email" />
-        <Field label="Password (min 6 chars)" type="password" value={form.password} onChange={(v) => setForm({ ...form, password: v })} testid="signup-password" />
-        <button className="btn-primary w-full" disabled={busy || googleBusy} data-testid="signup-submit">{busy ? "Creating…" : "Create account"}</button>
-        <p className="text-sm text-center text-slate-500 pt-2">Already have an account? <Link to="/login" className="text-[#0D5C75] hover:underline" data-testid="link-login">Sign in</Link></p>
-      </form>
+    <AuthLayout title="Begin your journey" subtitle="Sign in or create an account with your email.">
+      <EmailOtpFlow mode="signup" onSuccess={() => nav("/plan")} />
+      <div className="flex items-center justify-center text-sm pt-4 border-t border-slate-200/70 mt-6">
+        <span className="text-slate-500">Already have an account? </span>
+        <Link to="/login" className="text-[#0D5C75] font-semibold hover:underline ml-1" data-testid="link-login">
+          Sign in
+        </Link>
+      </div>
     </AuthLayout>
   );
 }
 
 export function ForgotPassword() {
-  const [email, setEmail] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [resetToken, setResetToken] = useState(null);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      const { data } = await api.post("/auth/forgot-password", { email });
-      if (data.reset_token) setResetToken(data.reset_token);
-      toast.success(data.message);
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || "Failed");
-    } finally { setBusy(false); }
-  };
+  const nav = useNavigate();
 
   return (
-    <AuthLayout title="Reset your password" subtitle="Enter your email and we'll send a reset link.">
-      <form onSubmit={submit} className="space-y-4" data-testid="forgot-form">
-        <Field label="Email" type="email" value={email} onChange={setEmail} testid="forgot-email" />
-        <button className="btn-primary w-full" disabled={busy} data-testid="forgot-submit">{busy ? "Sending…" : "Send reset link"}</button>
-      </form>
-      {resetToken && (
-        <div className="mt-6 p-4 rounded-xl bg-amber-50 border border-amber-200 text-sm" data-testid="reset-token-box">
-          <div className="font-semibold text-amber-900">DEV MODE — email is MOCKED</div>
-          <div className="mt-2 text-amber-800">Your reset token (paste on the reset page):</div>
-          <code className="mt-2 block break-all bg-white p-2 rounded" data-testid="reset-token-value">{resetToken}</code>
-          <Link to={`/reset?token=${resetToken}`} className="inline-block mt-3 text-[#0D5C75] font-semibold hover:underline" data-testid="use-token-link">Use this token →</Link>
-        </div>
-      )}
+    <AuthLayout title="Passwordless Sign-In" subtitle="We now use passwordless email sign-in. Enter your email to receive a 6-digit code.">
+      <EmailOtpFlow mode="login" onSuccess={() => nav("/dashboard")} />
+      <div className="flex items-center justify-center text-sm pt-4 border-t border-slate-200/70 mt-6">
+        <Link to="/login" className="text-[#0D5C75] font-semibold hover:underline" data-testid="link-login">
+          Back to Sign in
+        </Link>
+      </div>
     </AuthLayout>
   );
 }
 
 export function ResetPassword() {
-  const loc = useLocation();
   const nav = useNavigate();
-  const [token, setToken] = useState(new URLSearchParams(loc.search).get("token") || "");
-  const [pwd, setPwd] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  const submit = async (e) => {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      await api.post("/auth/reset-password", { token, new_password: pwd });
-      toast.success("Password reset. Sign in.");
-      nav("/login");
-    } catch (err) {
-      toast.error(err?.response?.data?.detail || "Failed");
-    } finally { setBusy(false); }
-  };
 
   return (
-    <AuthLayout title="Set new password" subtitle="Paste your reset token and choose a new password.">
-      <form onSubmit={submit} className="space-y-4" data-testid="reset-form">
-        <Field label="Reset token" value={token} onChange={setToken} testid="reset-token" />
-        <Field label="New password" type="password" value={pwd} onChange={setPwd} testid="reset-password" />
-        <button className="btn-primary w-full" disabled={busy} data-testid="reset-submit">{busy ? "Saving…" : "Reset password"}</button>
-      </form>
+    <AuthLayout title="Passwordless Sign-In" subtitle="Passwords are no longer needed! You can sign in anytime using your email and a 6-digit code.">
+      <EmailOtpFlow mode="login" onSuccess={() => nav("/dashboard")} />
+      <div className="flex items-center justify-center text-sm pt-4 border-t border-slate-200/70 mt-6">
+        <Link to="/login" className="text-[#0D5C75] font-semibold hover:underline" data-testid="link-login">
+          Back to Sign in
+        </Link>
+      </div>
     </AuthLayout>
-  );
-}
-
-function Field({ label, type = "text", value, onChange, testid }) {
-  return (
-    <label className="block">
-      <span className="text-xs uppercase tracking-widest text-slate-500 font-semibold">{label}</span>
-      <input
-        type={type} value={value} onChange={(e) => onChange(e.target.value)} required
-        data-testid={testid}
-        className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:border-[#E76F51] focus:outline-none transition-colors"
-      />
-    </label>
   );
 }
 

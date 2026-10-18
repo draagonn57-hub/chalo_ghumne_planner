@@ -16,6 +16,18 @@ export function AuthProvider({ children }) {
       .finally(() => setLoading(false));
   }, []);
 
+  const sendOtp = async (email) => {
+    const { data } = await api.post("/auth/otp/send", { email });
+    return data;
+  };
+
+  const verifyOtp = async (email, code) => {
+    const { data } = await api.post("/auth/otp/verify", { email, code });
+    localStorage.setItem("tp_token", data.token);
+    setUser(data.user);
+    return data;
+  };
+
   const login = async (email, password) => {
     const { data } = await api.post("/auth/login", { email, password });
     localStorage.setItem("tp_token", data.token);
@@ -48,7 +60,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthCtx.Provider value={{ user, loading, login, signup, loginWithGoogle, logout, refresh, setUser }}>
+    <AuthCtx.Provider value={{ user, loading, sendOtp, verifyOtp, login, signup, loginWithGoogle, logout, refresh, setUser }}>
       {children}
     </AuthCtx.Provider>
   );

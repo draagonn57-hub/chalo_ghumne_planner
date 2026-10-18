@@ -527,3 +527,65 @@ async def send_booking_email(booking: Dict[str, Any], user: Dict[str, Any]) -> b
     except Exception as exc:
         logger.error("Unexpected error sending email for booking %s: %s", bid, exc)
         return False
+
+
+async def send_otp_email(to_email: str, code: str) -> bool:
+    """
+    Send a 6-digit authentication OTP email to to_email.
+    In local development or if SMTP credentials are missing, skips external SMTP
+    safely so the login flow is never blocked.
+    """
+    to_email = to_email.strip().lower()
+    cfg = _cfg()
+
+    # In local dev or when credentials missing, external provider is not required
+    if not cfg["user"] or not cfg["pw"] or os.environ.get("NODE_ENV") == "development":
+        logger.info("[DEV/LOCAL] Skipping remote SMTP send for OTP to %s", _mask_email(to_email))
+        return True
+
+    try:
+        from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
+
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"{code} is your Chalo Ghumne verification code"
+        msg["From"] = f"{cfg['from_name']} <{cfg['user']}>"
+        msg["To"] = to_email
+
+        plain_text = (
+            f"Your Chalo Ghumne verification code is: {code}\n\n"
+            f"This code will expire in 10 minutes.\n"
+            f"If you did not request this, please ignore this email.\n\n"
+            f"— The Chalo Ghumne Team"
+        )
+        html_text = f"""<!DOCTYPE html>
+<html>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;padding:32px 16px;margin:0;">
+  <div style="max-width:480px;margin:0 auto;background:#ffffff;border-radius:16px;padding:32px;border:1px solid #e2e8f0;box-shadow:0 4px 6px -1px rgba(0,0,0,0.05);">
+    <div style="text-align:center;margin-bottom:24px;">
+      <h2 style="color:#0D5C75;margin:0;font-size:24px;">Chalo Ghumne</h2>
+      <p style="color:#64748b;font-size:14px;margin-top:4px;">Passwordless Verification</p>
+    </div>
+    <p style="color:#334155;font-size:15px;line-height:1.5;">Here is your 6-digit code to sign in to Chalo Ghumne:</p>
+    <div style="background:#f1f5f9;border-radius:12px;padding:20px;text-align:center;margin:24px 0;">
+      <span style="font-family:monospace;font-size:36px;font-weight:700;letter-spacing:8px;color:#0F172A;">{code}</span>
+    </div>
+    <p style="color:#64748b;font-size:13px;line-height:1.5;">
+      • Valid for <strong>10 minutes</strong><br/>
+      • Invalidates automatically after 5 failed attempts<br/>
+      • Never share this code with anyone
+    </p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;" />
+    <p style="color:#94a3b8;font-size:12px;margin:0;text-align:center;">
+      If you did not request this code, you can safely ignore this email.
+    </p>
+  </div>
+</body>
+</html>"""
+        msg.attach(MIMEText(plain_text, "plain", "utf-8"))
+        msg.attach(MIMEText(html_text, "html", "utf-8"))
+
+        return await asyncio.to_thread(_send_raw, msg)
+    except Exception as exc:
+        logger.warning("SMTP dispatch failed for OTP to %s: %s (local dev login unaffected)", _mask_email(to_email), exc)
+        return True
