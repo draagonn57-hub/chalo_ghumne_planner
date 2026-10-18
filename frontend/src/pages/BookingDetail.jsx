@@ -5,7 +5,8 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 import SmartImage from "@/components/SmartImage";
 import { formatINR } from "@/lib/bookingUtils";
-import { ArrowLeft, Download, Calendar, Plane, BedDouble, Users, MapPin, Sparkles, CircleCheck as CheckCircle2, Clock } from "lucide-react";
+import { SUPPORT_EMAIL, mailtoLink } from "@/lib/siteConfig";
+import { ArrowLeft, Download, Calendar, Plane, BedDouble, Users, MapPin, Sparkles, CircleCheck as CheckCircle2, Clock, Mail, RefreshCw, Train } from "lucide-react";
 import { jsPDF } from "jspdf";
 
 export default function BookingDetail() {
@@ -13,6 +14,7 @@ export default function BookingDetail() {
   const nav = useNavigate();
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [resending, setResending] = useState(false);
 
   useEffect(() => {
     if (!bookingId) { nav("/dashboard"); return; }
@@ -21,6 +23,23 @@ export default function BookingDetail() {
       .catch(() => { toast.error("Booking not found"); nav("/dashboard"); })
       .finally(() => setLoading(false));
   }, [bookingId, nav]);
+
+  const handleResendEmail = async () => {
+    if (resending) return;
+    setResending(true);
+    try {
+      await api.post(`/bookings/${bookingId}/resend-email`);
+      toast.success("Confirmation email queued!");
+      // Refresh booking to get updated email_status
+      const r = await api.get(`/bookings/${bookingId}`);
+      setBooking(r.data);
+    } catch (err) {
+      const detail = err?.response?.data?.detail;
+      toast.error(detail || `Could not resend email. Contact ${SUPPORT_EMAIL}.`);
+    } finally {
+      setResending(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -35,10 +54,20 @@ export default function BookingDetail() {
 
   const dest = booking.destination || {};
   const flight = booking.flight || {};
+  const train = booking.train || {};
   const hotel = booking.hotel || {};
   const room = booking.room || {};
   const pricing = booking.pricing || {};
   const travelers = booking.travelers || {};
+  const transportMode = (booking.transport_mode || "flight").toLowerCase();
+
+  const titleCase = (s) => s ? s.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ") : "";
+
+  const maskEmail = (email) => {
+    if (!email || !email.includes("@")) return "your email";
+    const [local, domain] = email.split("@");
+    return `${local[0]}***@${domain}`;
+  };
 
   const statusColor = {
     confirmed: "bg-[#0D5C75]/10 text-[#0D5C75]",
@@ -92,14 +121,22 @@ export default function BookingDetail() {
       <div className="mt-8 grid sm:grid-cols-2 gap-4">
         <DetailCard icon={Calendar} label="Trip">
           <div className="font-display text-xl">{booking.duration_days || 0} days</div>
-          {booking.origin && <div className="text-slate-500 text-sm">From {booking.origin}</div>}
+          {booking.origin && <div className="text-slate-500 text-sm">From {titleCase(booking.origin)}</div>}
         </DetailCard>
 
-        <DetailCard icon={Plane} label="Flight">
-          <div className="font-semibold">{flight.airline || "—"}</div>
-          <div className="text-slate-500 text-sm">{flight.from} → {flight.to}</div>
-          <div className="text-[#0D5C75] font-semibold text-sm mt-1">{flight.price}</div>
-        </DetailCard>
+        {transportMode === "train" && train?.name ? (
+          <DetailCard icon={Train} label="Train">
+            <div className="font-semibold">{train.name || "—"} <span className="text-slate-400 text-xs font-normal">#{train.number}</span></div>
+            <div className="text-slate-500 text-sm">{train.from_station} → {train.to_station}</div>
+            {train.classes?.[0] && <div className="text-[#0D5C75] font-semibold text-sm mt-1">{train.classes[0].name} · {train.classes[0].price}</div>}
+          </DetailCard>
+        ) : (
+          <DetailCard icon={Plane} label="Flight">
+            <div className="font-semibold">{flight.airline || "—"}</div>
+            <div className="text-slate-500 text-sm">{flight.from} → {flight.to}</div>
+            <div className="text-[#0D5C75] font-semibold text-sm mt-1">{flight.price}</div>
+          </DetailCard>
+        )}
 
         <DetailCard icon={BedDouble} label="Hotel & Room">
           <div className="font-semibold">{hotel.name || "—"}</div>
@@ -109,8 +146,16 @@ export default function BookingDetail() {
 
         <DetailCard icon={Users} label="Travelers">
           <div className="font-semibold">{travelers.fullName || "—"}</div>
-          <div className="text-slate-500 text-sm">{travelers.email} · {travelers.phone}</div>
           <div className="text-slate-500 text-sm">{travelers.numTravelers || 1} traveler(s)</div>
+          {travelers.passengers?.length > 0 && (
+            <ul className="mt-1 space-y-0.5">
+              {travelers.passengers.map((p, i) => (
+                <li key={i} className="text-slate-500 text-sm">
+                  {p.name || `Passenger ${i + 1}`}{p.dob ? ` · ${p.dob}` : ""}{p.gender ? ` · ${p.gender}` : ""}
+                </li>
+              ))}
+            </ul>
+          )}
         </DetailCard>
       </div>
 
@@ -150,6 +195,50 @@ export default function BookingDetail() {
         <div className="mt-4 p-3 rounded-lg bg-[#E76F51]/8 text-xs text-center">
           Demo Payment · Transaction: {booking.transaction_id || "—"} · No real money was charged
         </div>
+      </div>
+
+      {/* Email status + resend */}
+      <div className="mt-4 tp-card p-5">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <Mail size={16} className="text-[#0D5C75]" />
+            {booking.email_status === "sent" && (
+              <span data-testid="email-status-badge">Confirmation email sent{booking._account_email ? ` to ${maskEmail(booking._account_email)}` : ""}</span>
+            )}
+            {booking.email_status === "failed" && (
+              <span className="text-[#E76F51]" data-testid="email-status-badge">Confirmation email could not be sent</span>
+            )}
+            {booking.email_status === "skipped" && (
+              <span className="text-slate-400" data-testid="email-status-badge">Email notifications not configured</span>
+            )}
+            {(!booking.email_status || booking.email_status === "pending") && (
+              <span className="text-slate-400" data-testid="email-status-badge">Email status: {booking.email_status || "—"}</span>
+            )}
+          </div>
+          {booking.booking_status === "confirmed" && (
+            <button
+              onClick={handleResendEmail}
+              disabled={resending}
+              className="btn-ghost flex items-center gap-2 text-sm disabled:opacity-50"
+              data-testid="resend-email-btn"
+            >
+              <RefreshCw size={14} className={resending ? "animate-spin" : ""} />
+              {resending ? "Sending…" : "Resend confirmation email"}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Support */}
+      <div className="mt-3 p-4 rounded-xl bg-slate-50 text-sm text-center text-slate-600">
+        Need help with this booking?{" "}
+        <a
+          href={mailtoLink(`Booking help — ${booking.booking_id}`)}
+          className="text-[#0D5C75] hover:underline font-semibold select-text"
+          data-testid="detail-support-link"
+        >
+          Email {SUPPORT_EMAIL}
+        </a>
       </div>
 
       {/* Actions */}

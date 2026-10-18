@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { SUPPORT_EMAIL, mailtoLink } from "@/lib/siteConfig";
 
 export default function Footer() {
   return (
@@ -39,8 +40,24 @@ export default function Footer() {
 
         <div>
           <div className="eyebrow text-slate-300">Contact</div>
-          <p className="mt-4 text-sm text-slate-200">hello@chaloghumne.travel</p>
-          <p className="text-sm text-slate-400 mt-1">Made with wanderlust — 2026</p>
+          <p className="mt-4 text-sm text-slate-200">
+            <a
+              href={mailtoLink("Chalo Ghumne support")}
+              className="underline hover:text-white transition-colors select-text"
+              data-testid="footer-support-email"
+            >
+              {SUPPORT_EMAIL}
+            </a>
+          </p>
+          <a
+            href={mailtoLink("Chalo Ghumne support")}
+            className="inline-block mt-3 text-sm font-semibold text-white bg-white/10 hover:bg-white/20 transition-colors px-4 py-2 rounded-full"
+            data-testid="footer-send-email-btn"
+          >
+            Send us an email
+          </a>
+          <p className="text-sm text-slate-400 mt-3">Made with wanderlust — 2026</p>
+          <p className="text-xs text-slate-400 mt-2">Demo project · no real bookings</p>
         </div>
       </div>
 

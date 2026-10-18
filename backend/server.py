@@ -27,6 +27,8 @@ from auth import (
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
+from email_service import send_booking_email
+
 from ai_service import generate_itinerary, generate_suggestions, generate_activity_replacement, generate_assistant_reply, generate_refined_itinerary, generate_similar_destinations, generate_trains, compare_destinations
 from seed import seed_all
 from transport_service import get_trains as fetch_real_trains, get_flights as fetch_real_flights, get_fare as fetch_real_fare, init_db as init_transport_db
@@ -305,6 +307,12 @@ class BookingCreate(BaseModel):
     payment_status: str = "demo_paid"
     transaction_id: str = ""
     booking_status: str = "confirmed"
+    # Optional: itinerary snapshot stored at booking time for PDF generation
+    itinerary_snapshot: Optional[Dict[str, Any]] = None
+    # Optional: transport mode (flight | train)
+    transport_mode: Optional[str] = "flight"
+    # Optional: train selection (populated when transport_mode == "train")
+    train: Optional[Dict[str, Any]] = None
 
 
 # ============================================================
@@ -453,7 +461,15 @@ async def google_auth(body: GoogleAuthIn):
             detail="Incomplete Google token information (missing sub or email)",
         )
 
-    email = email.lower()
+    # Require email_verified from Google (skip check for test tokens)
+    is_test = os.environ.get("TESTING") == "1" or os.environ.get("ENV") == "test"
+    if not is_test and not idinfo.get("email_verified", False):
+        raise HTTPException(
+            status_code=400,
+            detail="Google account email is not verified. Please verify your Google email first.",
+        )
+
+    email = email.lower().strip()
 
     # Find existing user by googleId or email
     user = await db.users.find_one({
@@ -1865,16 +1881,157 @@ async def create_booking(
         "user_id": user["user_id"],
         **body.model_dump(),
         "created_at": now_iso(),
+        # Email tracking fields
+        "email_status": "pending",
+        "email_sent_at": None,
+        "email_attempts": 0,
     }
 
     await db.bookings.insert_one(doc)
 
+    # Backfill itinerary snapshot if the client didn't send one but an itinerary
+    # was referenced — so the PDF/email can render the day-by-day plan.
+    if not doc.get("itinerary_snapshot") and doc.get("itinerary_id"):
+        itin_doc = await db.itineraries.find_one({"id": doc["itinerary_id"]})
+        if itin_doc:
+            snapshot = itin_doc.get("itinerary", {})
+            await db.bookings.update_one(
+                {"booking_id": booking_id},
+                {"$set": {"itinerary_snapshot": snapshot}},
+            )
+            doc["itinerary_snapshot"] = snapshot
+
+    # Fetch full user document (need real account email, never trust client)
+    user_doc = await db.users.find_one({"id": user["user_id"]}, {"_id": 0})
+
+    # Trigger email in background — booking response is never delayed by it
+    if user_doc:
+        asyncio.create_task(_send_booking_email_task(doc, user_doc))
+
     return sanitize(doc)
 
 
-@api.get("/bookings")
-async def list_bookings(
+# ── Email background task + idempotency ────────────────────────────────────────
+
+async def _send_booking_email_task(booking: dict, user: dict):
+    """
+    Background task: send booking confirmation email exactly once.
+    Atomic find_one_and_update prevents duplicate sends on refresh/retry.
+    """
+    bid = booking.get("booking_id")
+
+    def _mask(e: str) -> str:
+        if not e or "@" not in e:
+            return "***"
+        local, domain = e.split("@", 1)
+        return f"{local[0]}***@{domain}"
+
+    # Atomic claim — only process if still pending
+    claimed = await db.bookings.find_one_and_update(
+        {"booking_id": bid, "email_status": "pending"},
+        {"$set": {"email_status": "sending"}, "$inc": {"email_attempts": 1}},
+    )
+    if not claimed:
+        logger.info("Email for booking %s already processed — skipping duplicate", bid)
+        return
+
+    try:
+        import os as _os
+        smtp_user = _os.environ.get("SMTP_USER", "").strip()
+        smtp_pw   = _os.environ.get("SMTP_APP_PASSWORD", "").replace(" ", "")
+        if not smtp_user or not smtp_pw:
+            await db.bookings.update_one(
+                {"booking_id": bid},
+                {"$set": {"email_status": "skipped"}},
+            )
+            logger.warning("SMTP credentials not configured — email skipped for booking %s", bid)
+            return
+
+        success = await send_booking_email(booking, user)
+        new_status = "sent" if success else "failed"
+        await db.bookings.update_one(
+            {"booking_id": bid},
+            {"$set": {
+                "email_status": new_status,
+                "email_sent_at": now_iso() if success else None,
+            }},
+        )
+        if success:
+            logger.info("Booking email sent for %s → %s", bid, _mask(user.get("email", "")))
+        else:
+            logger.warning("Booking email failed for %s", bid)
+    except Exception as exc:
+        logger.error("Email task crashed for booking %s: %s", bid, exc)
+        try:
+            await db.bookings.update_one(
+                {"booking_id": bid},
+                {"$set": {"email_status": "failed"}},
+            )
+        except Exception:
+            pass
+
+
+# ── Resend email endpoint ──────────────────────────────────────────────────────
+
+@api.post("/bookings/{booking_id}/resend-email")
+async def resend_booking_email(
+    booking_id: str,
     user=Depends(get_current_user),
+):
+    """
+    Resend the confirmation email to the booking owner.
+    Limited to 3 resends per booking per day.
+    Always sends to the ACCOUNT email (never from request body).
+    """
+    doc = await db.bookings.find_one({"booking_id": booking_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Booking not found")
+    if doc["user_id"] != user["user_id"] and user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Forbidden")
+    if doc.get("booking_status") != "confirmed":
+        raise HTTPException(status_code=400, detail="Booking is not confirmed")
+
+    # Rate limit: max 3 resends per day
+    attempts_today = doc.get("email_attempts", 0)
+    last_sent = doc.get("email_sent_at")
+    if last_sent:
+        try:
+            from datetime import date
+            sent_date = datetime.fromisoformat(last_sent).date()
+            if sent_date == datetime.now(timezone.utc).date():
+                if attempts_today >= 3:
+                    raise HTTPException(
+                        status_code=429,
+                        detail="Maximum 3 email resends per booking per day reached. Try again tomorrow.",
+                    )
+        except (ValueError, AttributeError):
+            pass
+
+    user_doc = await db.users.find_one({"id": user["user_id"]}, {"_id": 0})
+    if not user_doc:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    # Reset to pending so the task can claim it
+    await db.bookings.update_one(
+        {"booking_id": booking_id},
+        {"$set": {"email_status": "pending"}},
+    )
+    asyncio.create_task(_send_booking_email_task(doc, user_doc))
+
+    def _mask(e: str) -> str:
+        if not e or "@" not in e:
+            return "***"
+        local, domain = e.split("@", 1)
+        return f"{local[0]}***@{domain}"
+
+    return {
+        "message": f"Email will be sent to {_mask(user_doc.get('email', ''))}",
+        "email_status": "pending",
+    }
+
+
+@api.get("/bookings")
+async def list_bookings(    user=Depends(get_current_user),
 ):
 
     docs = await db.bookings.find(

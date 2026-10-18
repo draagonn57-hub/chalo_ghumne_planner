@@ -3,12 +3,18 @@ Unit tests for Compare feature in Chalo Ghumne AI tour planner.
 Tests schema validation, normalization, tie-breaking, error handling, and server limits.
 """
 
+import os
+import sys
 import unittest
-from backend.ai_service import (
+
+# Make backend modules importable whether run from repo root or backend/
+sys.path.insert(0, os.path.dirname(__file__))
+
+from ai_service import (
     validate_compare_result,
     COMPARE_SYSTEM_PROMPT,
 )
-from backend.server import CompareIn, DestinationChoice, QuestionnaireIn
+from server import CompareIn, DestinationChoice, QuestionnaireIn
 
 
 class TestCompareValidation(unittest.TestCase):

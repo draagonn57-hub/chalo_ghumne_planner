@@ -5,13 +5,15 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { jsPDF } from "jspdf";
 import { formatINR } from "@/lib/bookingUtils";
-import { CircleCheck as CheckCircle2, Download, Hop as Home, Calendar, Plane, BedDouble, Users, MapPin, ArrowRight, Sparkles } from "lucide-react";
+import { SUPPORT_EMAIL, mailtoLink } from "@/lib/siteConfig";
+import { CircleCheck as CheckCircle2, Download, Hop as Home, Calendar, Plane, BedDouble, Users, MapPin, ArrowRight, Sparkles, Mail, Train } from "lucide-react";
 
 export default function BookingConfirmation() {
   const { bookingId } = useParams();
   const nav = useNavigate();
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [emailStatus, setEmailStatus] = useState(null);
 
   useEffect(() => {
     const raw = sessionStorage.getItem("tp_last_booking");
@@ -20,14 +22,26 @@ export default function BookingConfirmation() {
         const parsed = JSON.parse(raw);
         if (parsed.booking_id === bookingId || !bookingId) {
           setBooking(parsed);
+          setEmailStatus(parsed.email_status || null);
           setLoading(false);
+          // If still pending, poll once after 5s
+          if (parsed.email_status === "pending") {
+            setTimeout(() => {
+              api.get(`/bookings/${parsed.booking_id}`)
+                .then((r) => {
+                  setEmailStatus(r.data.email_status);
+                  setBooking(r.data);
+                })
+                .catch(() => {});
+            }, 5000);
+          }
           return;
         }
       } catch { /* fall through */ }
     }
     if (bookingId) {
       api.get(`/bookings/${bookingId}`)
-        .then((r) => setBooking(r.data))
+        .then((r) => { setBooking(r.data); setEmailStatus(r.data.email_status); })
         .catch(() => {
           toast.error("Booking not found");
           nav("/dashboard");
@@ -52,10 +66,19 @@ export default function BookingConfirmation() {
 
   const dest = booking.destination || {};
   const flight = booking.flight || {};
+  const train = booking.train || {};
   const hotel = booking.hotel || {};
   const room = booking.room || {};
   const pricing = booking.pricing || {};
   const travelers = booking.travelers || {};
+  const transportMode = (booking.transport_mode || "flight").toLowerCase();
+
+  // Mask email for display
+  const maskEmail = (email) => {
+    if (!email || !email.includes("@")) return "your email";
+    const [local, domain] = email.split("@");
+    return `${local[0]}***@${domain}`;
+  };
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-10 sm:py-14" data-testid="booking-confirmation">
@@ -80,6 +103,31 @@ export default function BookingConfirmation() {
         <p className="text-slate-600 mt-3 text-lg">
           Your trip to {dest.name || "your destination"} is confirmed.
         </p>
+
+        {/* Email status notice */}
+        {emailStatus === "sent" && (
+          <div className="mt-4 flex items-center justify-center gap-2 text-sm text-[#0D5C75]" data-testid="email-status-sent">
+            <Mail size={16} />
+            <span>Confirmation email sent to <strong>{maskEmail(booking._account_email || "your account")}</strong></span>
+          </div>
+        )}
+        {emailStatus === "pending" && (
+          <div className="mt-4 flex items-center justify-center gap-2 text-sm text-slate-500" data-testid="email-status-pending">
+            <Mail size={16} className="animate-pulse" />
+            <span>Sending your confirmation email…</span>
+          </div>
+        )}
+        {emailStatus === "failed" && (
+          <div className="mt-4 text-sm text-[#E76F51] text-center" data-testid="email-status-failed">
+            We couldn&apos;t send the confirmation email. You can resend it from your{" "}
+            <Link to={`/bookings/${booking.booking_id}`} className="underline font-semibold">booking page</Link>.
+          </div>
+        )}
+        {emailStatus === "skipped" && (
+          <div className="mt-4 text-sm text-slate-400 text-center" data-testid="email-status-skipped">
+            Email notifications are not configured on this instance.
+          </div>
+        )}
       </motion.div>
 
       {/* Booking details card */}
@@ -104,13 +152,21 @@ export default function BookingConfirmation() {
 
           <Section icon={Calendar} label="Trip">
             <div>{booking.duration_days || 0} days</div>
-            {booking.origin && <div className="text-slate-500">From {booking.origin}</div>}
+            {booking.origin && <div className="text-slate-500">From {booking.origin.split(" ").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ")}</div>}
           </Section>
 
-          <Section icon={Plane} label="Flight">
-            <div>{flight.airline || "—"}</div>
-            <div className="text-slate-500">{flight.from} → {flight.to} · {flight.price}</div>
-          </Section>
+          {transportMode === "train" && train?.name ? (
+            <Section icon={Train} label="Train">
+              <div>{train.name || "—"} <span className="text-slate-400 text-xs">#{train.number}</span></div>
+              <div className="text-slate-500">{train.from_station} → {train.to_station}</div>
+              {train.classes?.[0] && <div className="text-slate-500">{train.classes[0].name} · {train.classes[0].price}</div>}
+            </Section>
+          ) : (
+            <Section icon={Plane} label="Flight">
+              <div>{flight.airline || "—"}</div>
+              <div className="text-slate-500">{flight.from} → {flight.to} · {flight.price}</div>
+            </Section>
+          )}
 
           <Section icon={BedDouble} label="Hotel & Room">
             <div>{hotel.name || "—"}</div>
@@ -119,7 +175,16 @@ export default function BookingConfirmation() {
 
           <Section icon={Users} label="Travelers">
             <div>{travelers.fullName || "—"}</div>
-            <div className="text-slate-500">{travelers.numTravelers || 1} traveler(s) · {travelers.email}</div>
+            <div className="text-slate-500">{travelers.numTravelers || 1} traveler(s)</div>
+            {travelers.passengers?.length > 0 && (
+              <ul className="mt-1 space-y-0.5">
+                {travelers.passengers.map((p, i) => (
+                  <li key={i} className="text-slate-500 text-sm">
+                    {p.name || `Passenger ${i + 1}`}{p.dob ? ` · ${p.dob}` : ""}{p.gender ? ` · ${p.gender}` : ""}
+                  </li>
+                ))}
+              </ul>
+            )}
           </Section>
 
           {booking.addons?.length > 0 && (
@@ -150,8 +215,21 @@ export default function BookingConfirmation() {
         </div>
       </motion.div>
 
+      {/* Support */}
+      <div className="mt-4 p-4 rounded-xl bg-slate-50 text-sm text-center text-slate-600" data-testid="booking-support-note">
+        Need help with this booking?{" "}
+        <a
+          href={mailtoLink(`Booking help — ${booking.booking_id}`)}
+          className="text-[#0D5C75] hover:underline font-semibold select-text"
+          data-testid="confirmation-support-link"
+        >
+          Email {SUPPORT_EMAIL}
+        </a>
+        <span className="text-slate-400"> · Booking ID: {booking.booking_id}</span>
+      </div>
+
       {/* Actions */}
-      <div className="mt-8 grid sm:grid-cols-2 gap-3">
+      <div className="mt-6 grid sm:grid-cols-2 gap-3">
         <Link to={`/bookings/${booking.booking_id}`} className="btn-secondary flex items-center justify-center gap-2" data-testid="view-booking-btn">
           View Booking <ArrowRight size={16} />
         </Link>

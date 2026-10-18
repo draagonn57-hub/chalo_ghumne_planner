@@ -3,13 +3,19 @@ Unit tests for Explore More Places feature in Chalo Ghumne.
 Tests destination normalization, deduplication, suggestion filtering, and model schema.
 """
 
+import os
+import sys
 import unittest
-from backend.ai_service import (
+
+# Make backend modules importable whether run from repo root or backend/
+sys.path.insert(0, os.path.dirname(__file__))
+
+from ai_service import (
     normalize_destination_name,
     is_duplicate_destination,
     _validate_and_filter_suggestions,
 )
-from backend.server import QuestionnaireIn
+from server import QuestionnaireIn
 
 
 class TestExploreMoreDeduplication(unittest.TestCase):

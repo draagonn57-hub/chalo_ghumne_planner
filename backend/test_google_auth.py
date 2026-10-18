@@ -82,6 +82,7 @@ class TestGoogleAuthEndpoint(unittest.IsolatedAsyncioTestCase):
         mock_verify.return_value = {
             "sub": "google_unique_id_999",
             "email": "traveler@gmail.com",
+            "email_verified": True,
             "name": "Happy Traveler",
             "picture": "https://example.com/avatar.jpg",
         }
@@ -111,6 +112,7 @@ class TestGoogleAuthEndpoint(unittest.IsolatedAsyncioTestCase):
         mock_verify.return_value = {
             "sub": "google_unique_id_888",
             "email": "existing@gmail.com",
+            "email_verified": True,
             "name": "Existing User",
             "picture": "https://example.com/pic.jpg",
         }

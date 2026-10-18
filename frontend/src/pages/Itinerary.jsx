@@ -445,9 +445,10 @@ function ItineraryView({
     }
   };
 
-  if (!localIt) return null;
-
-  const isDomestic = isIndiaDomestic(localIt);
+  // Hooks must run unconditionally (react-hooks/rules-of-hooks), so compute
+  // isDomestic safely and defer the no-itinerary early return until after all
+  // hooks have been called.
+  const isDomestic = localIt ? isIndiaDomestic(localIt) : false;
 
   // ── Real transport data from backend APIs ─────────────────────────────────
   const {
@@ -473,6 +474,8 @@ function ItineraryView({
     if (realTrains.length > 0)  next.trains  = realTrains;
     return next;
   }, [localIt, realFlights, realTrains]);
+
+  if (!localIt) return null;
 
   const showTrains = isDomestic;
 

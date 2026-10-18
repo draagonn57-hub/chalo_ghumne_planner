@@ -77,7 +77,7 @@ function Users_() {
   const load = () => api.get("/admin/users").then((r) => setList(r.data));
   useEffect(() => { load(); }, []);
   const del = async (id) => {
-    if (!confirm("Delete user?")) return;
+    if (!window.confirm("Delete user?")) return;
     await api.delete(`/admin/users/${id}`); toast.success("Deleted"); load();
   };
   return (
@@ -114,7 +114,7 @@ function Dests() {
     await api.post("/admin/destinations", { ...f, tags: [] });
     toast.success("Added"); setF({ name: "", country: "", type: "national", description: "", image: "" }); load();
   };
-  const del = async (id) => { if (!confirm("Delete?")) return; await api.delete(`/admin/destinations/${id}`); load(); };
+  const del = async (id) => { if (!window.confirm("Delete?")) return; await api.delete(`/admin/destinations/${id}`); load(); };
   return (
     <div className="grid lg:grid-cols-3 gap-6" data-testid="admin-dests">
       <form onSubmit={add} className="tp-card p-6 space-y-3">
@@ -151,7 +151,7 @@ function Hotels() {
     await api.post("/admin/hotels", { ...f, price_per_night: Number(f.price_per_night), rating: Number(f.rating), amenities: [] });
     toast.success("Added"); setF({ name: "", city: "", price_per_night: 100, rating: 4.0, image: "" }); load();
   };
-  const del = async (id) => { if (!confirm("Delete?")) return; await api.delete(`/admin/hotels/${id}`); load(); };
+  const del = async (id) => { if (!window.confirm("Delete?")) return; await api.delete(`/admin/hotels/${id}`); load(); };
   return (
     <div className="grid lg:grid-cols-3 gap-6" data-testid="admin-hotels">
       <form onSubmit={add} className="tp-card p-6 space-y-3">
@@ -180,7 +180,7 @@ function Feedback() {
   const [list, setList] = useState([]);
   const load = () => api.get("/admin/feedback").then((r) => setList(r.data));
   useEffect(() => { load(); }, []);
-  const del = async (id) => { if (!confirm("Delete?")) return; await api.delete(`/admin/feedback/${id}`); load(); };
+  const del = async (id) => { if (!window.confirm("Delete?")) return; await api.delete(`/admin/feedback/${id}`); load(); };
   return (
     <div className="space-y-3" data-testid="admin-feedback">
       {list.length === 0 && <div className="text-slate-500">No feedback yet.</div>}
