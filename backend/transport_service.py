@@ -508,7 +508,7 @@ async def get_trains(
             "fare_quota_exceeded": False,
         })
 
-    return {"trains": result_trains, "error": None, "stale": stale}
+    return {"trains": result_trains[:5], "error": None, "stale": stale}
 
 
 # ── Fare (on-demand, one class at a time) ──────────────────────────────────────

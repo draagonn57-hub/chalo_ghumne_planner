@@ -1146,6 +1146,12 @@ function ItineraryView({
                                 </>
                               );
                             }
+                            if (fareData?.unavailable) {
+                              return <div className="text-xs text-slate-400">Not available</div>;
+                            }
+                            if (!fareData) {
+                              return <div className="text-xs text-slate-400 italic">Pick a class ↓</div>;
+                            }
                             return (
                               <a
                                 href="https://www.irctc.co.in"
@@ -1195,7 +1201,9 @@ function ItineraryView({
                                 ? `${cls.name} · …`
                                 : fareData?.price
                                   ? `${cls.name} · ${fareData.price}`
-                                  : cls.name;
+                                  : fareData?.unavailable
+                                    ? `${cls.name} ✗`
+                                    : cls.name;
                               return (
                                 <button
                                   key={ci}
@@ -1244,6 +1252,16 @@ function ItineraryView({
                           ✕ Deselect
                         </button>
                       )}
+
+                      {/* IRCTC link */}
+                      <a
+                        href={`https://www.irctc.co.in/nget/train-search`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-[#0D5C75] transition-colors"
+                      >
+                        View price on IRCTC ↗
+                      </a>
                     </motion.div>
                   );
                 })}
