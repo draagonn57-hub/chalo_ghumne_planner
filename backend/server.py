@@ -201,6 +201,24 @@ class CompareIn(BaseModel):
 
 
 # ------------------------------------------------------------
+# RECOMMEND (Smart Suggestions)
+# ------------------------------------------------------------
+
+ALLOWED_BUDGETS = {"budget", "mid-range", "luxury"}
+
+class RecommendPrefsIn(BaseModel):
+    budget: Optional[str] = None
+    duration_days: Optional[int] = None
+    companions: Optional[str] = None
+    origin: Optional[str] = None
+
+class RecommendIn(BaseModel):
+    visited_places: List[str] = Field(default_factory=list)
+    exclude_destinations: List[str] = Field(default_factory=list)
+    preferences: Optional[RecommendPrefsIn] = None
+
+
+# ------------------------------------------------------------
 # FEEDBACK
 # ------------------------------------------------------------
 
@@ -669,18 +687,167 @@ async def list_hotels(
 # RECOMMEND DESTINATIONS (based on saved/last trip)
 # ============================================================
 
+# ---------- shared helper ----------------------------------
+
+async def _recommend_load_saved(user_id: str):
+    """
+    Load the user's last 10 itineraries, collect visited destination
+    dicts + names, and return the most-recent trip's preferences.
+    Returns (docs, visited_dests, saved_names, last_prefs).
+    """
+    docs = await db.itineraries.find(
+        {"user_id": user_id},
+        {"_id": 0},
+    ).sort("created_at", -1).to_list(10)
+
+    visited_dests: list = []
+    saved_names: list = []
+    for doc in docs:
+        for d in doc.get("itinerary", {}).get("destinations", []):
+            if d.get("name"):
+                visited_dests.append(d)
+                saved_names.append(d["name"])
+
+    last_prefs: dict = docs[0].get("preferences", {}) if docs else {}
+    return docs, visited_dests, saved_names, last_prefs
+
+
+# ---------- status endpoint --------------------------------
+
+@api.get("/itinerary/recommend/status")
+async def recommend_status(
+    user=Depends(get_current_user),
+):
+    """Return whether the user has saved trips and their destination names."""
+    docs, _, saved_names, _ = await _recommend_load_saved(user["user_id"])
+    return {
+        "has_saved_trips": len(docs) > 0,
+        "saved_destinations": saved_names,
+    }
+
+
+# ---------- POST (main smart-suggest endpoint) -------------
+
+_DEFAULT_PREFS = {
+    "budget": "mid-range",
+    "duration_days": 5,
+    "companions": "solo",
+    "diet": "veg",
+    "interests": [],
+    "origin": "",
+    "travel_type": "",
+}
+
+@api.post("/itinerary/recommend")
+async def recommend_post(
+    body: RecommendIn,
+    user=Depends(get_current_user),
+):
+    """
+    Smart Suggestions:
+    - With saved trips: uses saved preferences + optional extra visited places.
+    - Without saved trips: uses user-supplied visited places + optional preferences.
+    Post-filters results, retries once if needed. Always returns exactly 4.
+    """
+    docs, visited_dests, saved_names, last_prefs = await _recommend_load_saved(
+        user["user_id"]
+    )
+    has_saved = len(docs) > 0
+
+    # 1. Clean visited_places
+    seen_lower: set = {n.lower().strip() for n in saved_names}
+    cleaned: list = []
+    for raw in (body.visited_places or []):
+        place = str(raw).strip()[:80]
+        if not place:
+            continue
+        low = place.lower()
+        if low in seen_lower:
+            continue
+        seen_lower.add(low)
+        cleaned.append(place)
+        if len(cleaned) >= 30:
+            break
+
+    # 2. Guard: need something to work with
+    if not has_saved and not cleaned:
+        raise HTTPException(
+            status_code=400,
+            detail="Add at least one place you've visited to get suggestions.",
+        )
+
+    # 3. Build preferences
+    if has_saved:
+        prefs = dict(last_prefs)
+    else:
+        prefs = dict(_DEFAULT_PREFS)
+        # Merge user-submitted prefs over defaults
+        if body.preferences:
+            up = body.preferences
+            if up.budget and up.budget in ALLOWED_BUDGETS:
+                prefs["budget"] = up.budget
+            if up.duration_days is not None:
+                prefs["duration_days"] = max(1, min(30, up.duration_days))
+            if up.companions is not None:
+                prefs["companions"] = str(up.companions)
+            if up.origin is not None:
+                prefs["origin"] = str(up.origin).strip()
+
+    # Ensure required keys always present for _preference_text + DetailGenerateIn
+    prefs.setdefault("diet", "veg")
+    prefs.setdefault("interests", [])
+    prefs.setdefault("origin", "")
+    prefs.setdefault("travel_type", "")
+    if not isinstance(prefs.get("interests"), list):
+        prefs["interests"] = []
+
+    # Combine all exclusions
+    exclude = list(body.exclude_destinations or [])
+
+    # 4. Call AI
+    try:
+        result = await generate_similar_destinations(
+            visited_dests,
+            prefs,
+            extra_visited=cleaned,
+            exclude=exclude,
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=502, detail=str(ve))
+    except Exception as e:
+        logger.exception("POST recommend: AI generation failed")
+        raise HTTPException(
+            status_code=502,
+            detail=f"AI generation failed: {str(e)[:200]}",
+        )
+
+    # 5. Post-filter already handled inside generate_similar_destinations.
+    #    (That function already retries once and raises ValueError if < 4.)
+
+    # 6. Build visited list for frontend deduplication
+    all_visited = list(dict.fromkeys(saved_names + cleaned))
+
+    return {
+        "preferences": prefs,
+        "visited": all_visited,
+        "has_saved_trips": has_saved,
+        **result,
+    }
+
+
+# ---------- GET (backward-compatible) ----------------------
+
 @api.get("/itinerary/recommend")
 async def recommend_destinations(
     user=Depends(get_current_user),
 ):
     """
-    Suggest destinations based on the user's saved trips.
-    Uses the most recent trip's preferences to find similar places.
+    Backward-compatible GET: suggest destinations from saved trips.
+    Returns 404 if no saved trips (same as before, so existing callers are unaffected).
     """
-    docs = await db.itineraries.find(
-        {"user_id": user["user_id"]},
-        {"_id": 0},
-    ).sort("created_at", -1).to_list(10)
+    docs, visited_dests, saved_names, last_prefs = await _recommend_load_saved(
+        user["user_id"]
+    )
 
     if not docs:
         raise HTTPException(
@@ -688,22 +855,10 @@ async def recommend_destinations(
             detail="No saved trips found. Plan a trip first to get recommendations.",
         )
 
-    # Collect visited destinations as dicts
-    visited_dests = []
-    visited_names = []
-    for doc in docs:
-        for d in doc.get("itinerary", {}).get("destinations", []):
-            if d.get("name"):
-                visited_dests.append(d)
-                visited_names.append(d["name"])
-
-    # Use most recent trip's preferences
-    last_prefs = docs[0].get("preferences", {})
-
     try:
         result = await generate_similar_destinations(visited_dests, last_prefs)
     except Exception as e:
-        logger.exception("Recommendation generation failed")
+        logger.exception("GET recommend: AI generation failed")
         raise HTTPException(
             status_code=502,
             detail=f"AI generation failed: {str(e)[:200]}",
@@ -711,7 +866,8 @@ async def recommend_destinations(
 
     return {
         "preferences": last_prefs,
-        "visited": visited_names,
+        "visited": saved_names,
+        "has_saved_trips": True,
         **result,
     }
 
