@@ -22,14 +22,17 @@ export default function BookingConfirmation() {
         const parsed = JSON.parse(raw);
         if (parsed.booking_id === bookingId || !bookingId) {
           setBooking(parsed);
-          setEmailStatus(parsed.email_status || null);
+          // Safely coerce email_status to string
+          const es = parsed.email_status;
+          setEmailStatus(typeof es === "string" ? es : null);
           setLoading(false);
           // If still pending, poll once after 5s
-          if (parsed.email_status === "pending") {
+          if (parsed.email_status === "pending" || parsed.email_status === "sending") {
             setTimeout(() => {
               api.get(`/bookings/${parsed.booking_id}`)
                 .then((r) => {
-                  setEmailStatus(r.data.email_status);
+                  const newEs = r.data.email_status;
+                  setEmailStatus(typeof newEs === "string" ? newEs : null);
                   setBooking(r.data);
                 })
                 .catch(() => {});
@@ -41,7 +44,11 @@ export default function BookingConfirmation() {
     }
     if (bookingId) {
       api.get(`/bookings/${bookingId}`)
-        .then((r) => { setBooking(r.data); setEmailStatus(r.data.email_status); })
+        .then((r) => {
+          setBooking(r.data);
+          const es = r.data.email_status;
+          setEmailStatus(typeof es === "string" ? es : null);
+        })
         .catch(() => {
           toast.error("Booking not found");
           nav("/dashboard");
@@ -108,19 +115,19 @@ export default function BookingConfirmation() {
         {emailStatus === "sent" && (
           <div className="mt-4 flex items-center justify-center gap-2 text-sm text-[#0D5C75]" data-testid="email-status-sent">
             <Mail size={16} />
-            <span>Confirmation email sent to <strong>{maskEmail(booking._account_email || "your account")}</strong></span>
+            <span>Confirmation email with PDF sent to your Gmail ✓</span>
           </div>
         )}
-        {emailStatus === "pending" && (
+        {(emailStatus === "pending" || emailStatus === "sending") && (
           <div className="mt-4 flex items-center justify-center gap-2 text-sm text-slate-500" data-testid="email-status-pending">
             <Mail size={16} className="animate-pulse" />
-            <span>Sending your confirmation email…</span>
+            <span>Sending confirmation email to your Gmail…</span>
           </div>
         )}
         {emailStatus === "failed" && (
           <div className="mt-4 text-sm text-[#E76F51] text-center" data-testid="email-status-failed">
-            We couldn&apos;t send the confirmation email. You can resend it from your{" "}
-            <Link to={`/bookings/${booking.booking_id}`} className="underline font-semibold">booking page</Link>.
+            Email delivery failed.{" "}
+            <Link to={`/bookings/${booking.booking_id}`} className="underline font-semibold">Resend from your booking page</Link>.
           </div>
         )}
         {emailStatus === "skipped" && (
@@ -249,11 +256,17 @@ export default function BookingConfirmation() {
 }
 
 function InfoRow({ label, value, mono, highlight, capitalize }) {
+  // Safely convert value to string to prevent React "Objects are not valid as child" errors
+  const safeValue = value === null || value === undefined
+    ? "—"
+    : typeof value === "object"
+      ? JSON.stringify(value)
+      : String(value);
   return (
     <div>
       <div className="eyebrow">{label}</div>
       <div className={`mt-1 ${mono ? "font-mono" : ""} ${highlight ? "text-[#0D5C75] font-semibold" : "text-slate-800"} ${capitalize ? "capitalize" : ""}`}>
-        {value}
+        {safeValue}
       </div>
     </div>
   );
