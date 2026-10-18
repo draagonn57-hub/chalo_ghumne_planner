@@ -2,14 +2,12 @@
 
 import os
 import uuid
-import json
 import logging
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request, Form
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import FastAPI, APIRouter, HTTPException, Depends
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -24,8 +22,6 @@ from auth import (
     create_token,
     get_current_user,
     require_admin,
-    verify_apple_id_token,
-    parse_apple_user_profile,
 )
 
 from google.oauth2 import id_token
@@ -68,8 +64,7 @@ class UserModel(BaseModel):
     password: Optional[str] = None
     password_hash: Optional[str] = None
     googleId: Optional[str] = Field(default=None, description="Google OAuth ID (unique, sparse)")
-    appleId: Optional[str] = Field(default=None, description="Apple OAuth ID (unique, sparse)")
-    authProvider: str = Field(default="local", description="Auth provider: local | google | apple")
+    authProvider: str = Field(default="local", description="Auth provider: local | google")
     role: str = "user"
     avatar: Optional[str] = None
     preferences: Dict[str, Any] = Field(default_factory=dict)
@@ -91,19 +86,6 @@ class GoogleAuthIn(BaseModel):
 
     def get_token(self) -> str:
         return self.credential or self.token or self.id_token or ""
-
-
-class AppleAuthIn(BaseModel):
-    id_token: Optional[str] = None
-    credential: Optional[str] = None
-    token: Optional[str] = None
-    code: Optional[str] = None
-    state: Optional[str] = None
-    user: Optional[Any] = None
-    error: Optional[str] = None
-
-    def get_token(self) -> str:
-        return self.id_token or self.credential or self.token or ""
 
 
 class LoginIn(BaseModel):
@@ -513,199 +495,6 @@ async def google_auth(body: GoogleAuthIn):
     return {
         "token": token,
         "user": sanitize(user),
-    }
-
-
-@api.post("/auth/apple/callback")
-@api.post("/auth/apple")
-async def apple_auth_callback(
-    request: Request,
-    id_token: Optional[str] = Form(None),
-    code: Optional[str] = Form(None),
-    state: Optional[str] = Form(None),
-    user: Optional[str] = Form(None),
-    error: Optional[str] = Form(None),
-):
-    """
-    Apple Sign-In callback endpoint.
-    Accepts:
-      - Apple incoming POST request with Content-Type: application/x-www-form-urlencoded
-      - Frontend JSON POST request with Content-Type: application/json
-    Verifies id_token using Apple's official public keys (https://appleid.apple.com/auth/keys)
-    via PyJWT JWKS client, validates issuer and audience, extracts user profile,
-    and returns session token alongside user profile.
-    """
-    def _clean_str(val: Any) -> Optional[str]:
-        if isinstance(val, str) and val.strip():
-            return val.strip()
-        return None
-
-    content_type = request.headers.get("content-type", "")
-    req_json: Dict[str, Any] = {}
-    if "application/json" in content_type:
-        try:
-            req_json = await request.json()
-        except Exception:
-            req_json = {}
-
-    # Extract fields from form parameters or json body
-    raw_token = (
-        _clean_str(id_token)
-        or _clean_str(req_json.get("id_token"))
-        or _clean_str(req_json.get("credential"))
-        or _clean_str(req_json.get("token"))
-    )
-    if not raw_token and isinstance(req_json.get("authorization"), dict):
-        raw_token = _clean_str(req_json["authorization"].get("id_token"))
-
-    raw_code = _clean_str(code) or _clean_str(req_json.get("code"))
-    if not raw_code and isinstance(req_json.get("authorization"), dict):
-        raw_code = _clean_str(req_json["authorization"].get("code"))
-
-    raw_user = (
-        _clean_str(user)
-        if isinstance(user, str)
-        else req_json.get("user")
-    )
-
-    raw_error = _clean_str(error) or _clean_str(req_json.get("error"))
-
-    accept = request.headers.get("accept", "")
-
-    # Handle cancellation or error reported by Apple
-    if raw_error:
-        logger.warning(f"Apple sign-in reported error: {raw_error}")
-        if "text/html" in accept and "application/json" not in accept:
-            html_err = f"""<!DOCTYPE html>
-<html>
-<head><title>Apple Sign In Failed</title></head>
-<body>
-<script>
-    if (window.opener) {{
-        window.opener.postMessage({{ type: "APPLE_AUTH_ERROR", error: "{raw_error}" }}, "*");
-        window.close();
-    }} else {{
-        window.location.href = "/login?error=" + encodeURIComponent("{raw_error}");
-    }}
-</script>
-<p>Authentication cancelled or failed.</p>
-</body>
-</html>"""
-            return HTMLResponse(content=html_err, status_code=400)
-        raise HTTPException(
-            status_code=400,
-            detail=f"Apple sign-in error: {raw_error}",
-        )
-
-    if not raw_token:
-        raise HTTPException(
-            status_code=400,
-            detail="Apple ID token is required",
-        )
-
-    client_id = (
-        os.environ.get("APPLE_CLIENT_ID")
-        or os.environ.get("REACT_APP_APPLE_CLIENT_ID")
-    )
-
-    try:
-        idinfo = verify_apple_id_token(raw_token, audience=client_id)
-    except Exception as e:
-        logger.error(f"Apple ID token verification failed: {e}")
-        raise HTTPException(
-            status_code=401,
-            detail=f"Invalid Apple ID token: {str(e)}",
-        )
-
-    apple_id = idinfo.get("sub")
-    if not apple_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Incomplete Apple token information (missing sub claim)",
-        )
-
-    # Safely capture user profile details (sent by Apple ONLY on first sign-in)
-    profile = parse_apple_user_profile(raw_user)
-    email = (idinfo.get("email") or profile.get("email") or "").lower().strip()
-    name = profile.get("name") or idinfo.get("name")
-
-    query_conditions = [{"appleId": apple_id}]
-    if email:
-        query_conditions.append({"email": email})
-
-    # Find existing user by appleId or email
-    user_record = await db.users.find_one({"$or": query_conditions})
-
-    if not user_record and not email:
-        raise HTTPException(
-            status_code=400,
-            detail="Incomplete Apple user information (email required for new account)",
-        )
-
-    if user_record:
-        update_doc = {}
-        if not user_record.get("appleId"):
-            update_doc["appleId"] = apple_id
-        if not user_record.get("authProvider"):
-            update_doc["authProvider"] = "apple"
-        if name and name != "Traveler" and (
-            not user_record.get("name")
-            or user_record.get("name") == "Traveler"
-            or user_record.get("name") == user_record.get("email", "").split("@")[0]
-        ):
-            update_doc["name"] = name
-
-        if update_doc:
-            await db.users.update_one({"id": user_record["id"]}, {"$set": update_doc})
-            user_record = await db.users.find_one({"id": user_record["id"]})
-    else:
-        name = name or (email.split("@")[0] if email else "Traveler")
-        user_record = {
-            "id": str(uuid.uuid4()),
-            "name": name,
-            "email": email,
-            "password_hash": None,
-            "appleId": apple_id,
-            "authProvider": "apple",
-            "role": "user",
-            "avatar": None,
-            "preferences": {},
-            "created_at": now_iso(),
-        }
-        await db.users.insert_one(user_record)
-
-    token = create_token(user_record["id"], user_record.get("role", "user"))
-
-    # If it is a browser navigation POST from Apple redirect
-    if "text/html" in accept and "application/json" not in accept:
-        sanitized_user_json = json.dumps(sanitize(user_record))
-        html_content = f"""<!DOCTYPE html>
-<html>
-<head><title>Apple Sign In Successful</title></head>
-<body>
-<p>Authenticating with Apple, please wait...</p>
-<script>
-    const authData = {{
-        token: "{token}",
-        user: {sanitized_user_json}
-    }};
-    if (window.opener) {{
-        window.opener.postMessage({{ type: "APPLE_AUTH_SUCCESS", ...authData }}, "*");
-        window.close();
-    }} else {{
-        try {{
-            localStorage.setItem("tp_token", authData.token);
-        }} catch(e) {{}}
-        window.location.href = "/dashboard";
-    }}
-</script>
-</body>
-</html>"""
-        return HTMLResponse(content=html_content)
-
-    return {
-        "token": token,
-        "user": sanitize(user_record),
     }
 
 
@@ -2281,7 +2070,6 @@ async def on_startup():
     try:
         try:
             await db.users.create_index("googleId", unique=True, sparse=True)
-            await db.users.create_index("appleId", unique=True, sparse=True)
             await db.users.create_index("email", unique=True)
         except Exception as idx_err:
             logger.warning(f"Index creation note: {idx_err}")
