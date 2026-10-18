@@ -150,6 +150,9 @@ export default function Booking() {
   };
 
   const handleCheckout = () => {
+    // Snapshot the full itinerary at booking time so the PDF/email can render the
+    // day-by-day plan even if the itinerary is later edited or deleted.
+    const itinSnapshot = itinDoc?.itinerary || itinDoc || null;
     const bookingPayload = {
       itinerary_id: itineraryId || null,
       destination: dest,
@@ -167,6 +170,9 @@ export default function Booking() {
       payment_status: "pending",
       transaction_id: "",
       booking_status: "pending",
+      itinerary_snapshot: itinSnapshot,
+      transport_mode: "flight",
+      train: null,
     };
     sessionStorage.setItem("tp_pending_booking", JSON.stringify(bookingPayload));
     nav("/booking/checkout");

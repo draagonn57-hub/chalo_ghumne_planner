@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { api } from "@/lib/api";
+import { mailtoLink } from "@/lib/siteConfig";
 import { toast } from "sonner";
 
 export function GoogleSignInButton({ onResponse, text = "continue_with", disabled = false }) {
@@ -358,6 +359,17 @@ function AuthLayout({ title, subtitle, children }) {
           <div className="mt-8">
             {children}
           </div>
+
+          <p className="mt-6 text-center text-xs text-slate-500">
+            Having trouble signing in?{" "}
+            <a
+              href={mailtoLink("Sign-in issue — Chalo Ghumne")}
+              className="text-[#0D5C75] hover:underline"
+              data-testid="auth-support-link"
+            >
+              Contact support
+            </a>
+          </p>
         </div>
 
         <div className="mt-8 text-center text-white/85 max-w-md animate-fade-up">
