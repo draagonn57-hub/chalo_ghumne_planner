@@ -5,6 +5,7 @@ import jwt
 from datetime import datetime, timezone, timedelta
 from fastapi import HTTPException, Header, status
 from typing import Optional
+from apple_auth import verify_apple_id_token, parse_apple_user_profile
 
 JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ALGO = "HS256"
