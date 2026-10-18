@@ -1843,3 +1843,200 @@ Apply the refinements above. Return ONLY the JSON, no markdown, no explanation.
         raise RuntimeError(f"AI returned invalid JSON: {e}") from e
 
     return refined
+
+
+# ============================================================
+# DESTINATION COMPARISON
+# ============================================================
+
+COMPARE_SYSTEM_PROMPT = """You are a travel decision expert. You get 2–4 destinations and the user's profile (budget, interests, group type, trip duration, travel dates, departure city). Compare ONLY the given destinations on:
+1. Estimated total budget (flights + stay + food + activities) vs the user's budget
+2. Match with the user's interests
+3. Best-season fit and weather for the user's travel dates
+4. Famous places and must-do experiences
+5. Travel time and connectivity from the departure city
+6. Safety and ease of travel for the user's group type
+7. Crowd level and overall value for money
+Score each criterion 1–10 per destination, weight the criteria by the user's stated priorities, and pick ONE winner. Do not invent prices or facts. If a figure is uncertain, give a range and label it an estimate. Respond ONLY with valid JSON:
+{
+  "winner": "string",
+  "winner_reason": "string (max 2 sentences)",
+  "criteria": [ { "name": "string", "scores": { "<place>": number }, "notes": { "<place>": "string (max 12 words)" } } ],
+  "overall_scores": { "<place>": number },
+  "why_not_others": { "<place>": "string (max 1 sentence)" }
+}"""
+
+
+def _lookup_place(mapping: Any, place: str) -> Any:
+    if not isinstance(mapping, dict):
+        return None
+    if place in mapping:
+        return mapping[place]
+    target = place.strip().lower()
+    for key, value in mapping.items():
+        if str(key).strip().lower() == target:
+            return value
+    return None
+
+
+def _coerce_score(value: Any) -> Optional[float]:
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if number != number:  # NaN
+        return None
+    return max(1.0, min(10.0, number))
+
+
+def validate_comparison_payload(
+    data: Any,
+    place_names: List[str],
+) -> Dict[str, Any]:
+    """
+    Validate and normalise the AI comparison JSON.
+    Raises ValueError if the payload is unusable.
+    Always returns exactly one winner (never a tie).
+    """
+    if not isinstance(data, dict):
+        raise ValueError("Comparison response must be a JSON object.")
+
+    if not place_names:
+        raise ValueError("No destinations to compare.")
+
+    canonical = {name.strip().lower(): name for name in place_names}
+
+    criteria_in = data.get("criteria")
+    if not isinstance(criteria_in, list) or not criteria_in:
+        raise ValueError("Comparison is missing criteria.")
+
+    clean_criteria: List[Dict[str, Any]] = []
+    for item in criteria_in:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        scores_in = item.get("scores")
+        notes_in = item.get("notes") if isinstance(item.get("notes"), dict) else {}
+        if not name or not isinstance(scores_in, dict):
+            continue
+
+        clean_scores: Dict[str, float] = {}
+        clean_notes: Dict[str, str] = {}
+        missing = False
+        for place in place_names:
+            score = _coerce_score(_lookup_place(scores_in, place))
+            if score is None:
+                missing = True
+                break
+            clean_scores[place] = score
+            note = str(_lookup_place(notes_in, place) or "").strip()
+            clean_notes[place] = note
+        if missing:
+            continue
+        clean_criteria.append({
+            "name": name,
+            "scores": clean_scores,
+            "notes": clean_notes,
+        })
+
+    if not clean_criteria:
+        raise ValueError("Comparison criteria were malformed.")
+
+    overall_in = data.get("overall_scores")
+    clean_overall: Dict[str, float] = {}
+    for place in place_names:
+        score = _coerce_score(_lookup_place(overall_in, place)) if isinstance(overall_in, dict) else None
+        if score is None:
+            avg = sum(row["scores"][place] for row in clean_criteria) / len(clean_criteria)
+            score = round(avg, 2)
+        clean_overall[place] = score
+
+    winner_raw = str(data.get("winner") or "").strip()
+    winner = canonical.get(winner_raw.lower())
+
+    if winner is None:
+        best = max(clean_overall[p] for p in place_names)
+        for place in place_names:
+            if clean_overall[place] == best:
+                winner = place
+                break
+
+    # Deterministic tie-break: original selection order (first max wins).
+    best = clean_overall[winner]
+    for place in place_names:
+        if clean_overall[place] > best:
+            winner = place
+            best = clean_overall[place]
+
+    why_in = data.get("why_not_others")
+    why_not: Dict[str, str] = {}
+    for place in place_names:
+        if place == winner:
+            continue
+        text = str(_lookup_place(why_in, place) or "").strip() if isinstance(why_in, dict) else ""
+        if not text:
+            text = (
+                f"{place} is appealing, but it is a slightly weaker overall "
+                "fit for this trip than the recommended pick."
+            )
+        why_not[place] = text
+
+    reason = str(data.get("winner_reason") or "").strip()
+    if not reason:
+        reason = f"{winner} is the strongest overall match for your preferences."
+
+    return {
+        "winner": winner,
+        "winner_reason": reason,
+        "criteria": clean_criteria,
+        "overall_scores": clean_overall,
+        "why_not_others": why_not,
+    }
+
+
+async def generate_destination_comparison(
+    prefs: Dict[str, Any],
+    destinations: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """
+    Compare 2–4 destinations against the user's questionnaire profile.
+    """
+    place_names = [
+        str(d.get("name") or "").strip()
+        for d in destinations
+        if str(d.get("name") or "").strip()
+    ]
+
+    dest_lines = []
+    for dest in destinations:
+        name = str(dest.get("name") or "").strip()
+        country = str(dest.get("country") or "").strip()
+        why = str(dest.get("why") or "").strip()
+        dest_lines.append(
+            f"- {name}"
+            + (f" ({country})" if country else "")
+            + (f": {why}" if why else "")
+        )
+
+    start_date = prefs.get("start_date") or "Not specified"
+    origin = prefs.get("origin") or "Not specified"
+
+    prompt = f"""
+User profile:
+{_preference_text(prefs)}
+Travel dates / month: {start_date}
+Departure city: {origin}
+
+Compare ONLY these destinations:
+{chr(10).join(dest_lines)}
+
+Place names to use as JSON keys (exactly, including spelling):
+{json.dumps(place_names)}
+
+Pick exactly ONE winner. Never return a tie.
+Do not invent prices or facts. If a figure is uncertain, give a range and label it an estimate.
+Respond ONLY with the required JSON.
+"""
+
+    data = _call(prompt, COMPARE_SYSTEM_PROMPT, temperature=0.4)
+    return validate_comparison_payload(data, place_names)

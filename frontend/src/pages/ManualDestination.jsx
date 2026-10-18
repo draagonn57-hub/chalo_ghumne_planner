@@ -156,7 +156,7 @@ export default function ManualDestination() {
               labelIcon={<MapPin size={12} />}
               value={query}
               onChange={(val) => setQuery(val)}
-              placeholder="e.g. Tokyo, Paris, Manali…"
+              placeholder="Enter your destination (e.g. Taj Mahal)"
               inputIcon={<Search size={18} />}
               onKeyDown={(e) => e.key === "Enter" && canSubmit && generate()}
               testId="manual-destination-input"

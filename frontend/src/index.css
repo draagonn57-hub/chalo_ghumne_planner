@@ -134,14 +134,218 @@ html, body, #root {
 
 /* Focus ring */
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+
   outline: none;
   box-shadow: 0 0 0 3px rgba(231, 111, 81, 0.35);
   border-radius: 8px;
 }
 
+
+/* Checkbox focus ring */
 button[role="checkbox"]:focus-visible {
   border-radius: 9999px !important;
   box-shadow: 0 0 0 3px rgba(13, 92, 117, 0.45) !important;
+}
+
+/* Destination compare selection */
+.compare-check {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 12px -4px rgba(13, 92, 117, 0.35);
+  color: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+.compare-check:hover:not(:disabled) {
+  border-color: var(--tp-primary);
+}
+.compare-check[aria-checked="true"] {
+  background: var(--tp-primary);
+  border-color: var(--tp-primary);
+  color: #fff;
+}
+.compare-check:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.compare-check:focus-visible {
+  box-shadow: 0 0 0 3px rgba(231, 111, 81, 0.35);
+}
+@keyframes compareCheckIn {
+  from { transform: scale(0.65); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.compare-check-icon {
+  animation: compareCheckIn 150ms ease both;
+}
+.compare-card-selected {
+  outline: 2px solid var(--tp-primary);
+  outline-offset: 0;
+  box-shadow: 0 18px 40px -10px rgba(13, 92, 117, 0.22);
+}
+.compare-btn {
+  background: var(--tp-primary);
+  color: #fff;
+  border-radius: 9999px;
+  padding: 0.55rem 1.15rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  box-shadow: 0 8px 24px -10px rgba(13, 92, 117, 0.45);
+  transition: background-color 200ms ease, transform 200ms ease, box-shadow 200ms ease, opacity 200ms ease;
+}
+.compare-btn:hover:not(:disabled) {
+  background: var(--tp-primary-hover);
+}
+.compare-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.compare-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.compare-hint {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  white-space: nowrap;
+  background: #1A2530;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0.35rem 0.55rem;
+  border-radius: 9999px;
+  box-shadow: 0 8px 20px -8px rgba(13, 92, 117, 0.45);
+  pointer-events: none;
+}
+.compare-hint::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  background: #1A2530;
+  transform: rotate(45deg);
+}
+
+/* Destination compare selection */
+.compare-check {
+  width: 28px;
+  height: 28px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.95);
+  box-shadow: 0 4px 12px -4px rgba(13, 92, 117, 0.35);
+  color: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, box-shadow 150ms ease;
+}
+.compare-check:hover:not(:disabled) {
+  border-color: var(--tp-primary);
+}
+.compare-check[aria-checked="true"] {
+  background: var(--tp-primary);
+  border-color: var(--tp-primary);
+  color: #fff;
+}
+.compare-check:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.compare-check:focus-visible {
+  box-shadow: 0 0 0 3px rgba(231, 111, 81, 0.35);
+}
+@keyframes compareCheckIn {
+  from { transform: scale(0.65); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.compare-check-icon {
+  animation: compareCheckIn 150ms ease both;
+}
+.compare-card-selected {
+  outline: 2px solid var(--tp-primary);
+  outline-offset: 0;
+  box-shadow: 0 18px 40px -10px rgba(13, 92, 117, 0.22);
+}
+.compare-btn {
+  background: var(--tp-primary);
+  color: #fff;
+  border-radius: 9999px;
+  padding: 0.55rem 1.15rem;
+  font-weight: 600;
+  font-size: 0.875rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  box-shadow: 0 8px 24px -10px rgba(13, 92, 117, 0.45);
+  transition: background-color 200ms ease, transform 200ms ease, box-shadow 200ms ease, opacity 200ms ease;
+}
+.compare-btn:hover:not(:disabled) {
+  background: var(--tp-primary-hover);
+}
+.compare-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.compare-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.compare-hint {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  white-space: nowrap;
+  background: #1A2530;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  padding: 0.35rem 0.55rem;
+  border-radius: 9999px;
+  box-shadow: 0 8px 20px -8px rgba(13, 92, 117, 0.45);
+  pointer-events: none;
+}
+.compare-hint::before {
+  content: "";
+  position: absolute;
+  top: -4px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  background: #1A2530;
+  transform: rotate(45deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compare-check-icon {
+    animation: none;
+  }
+
 }
 
 /* Skeleton shimmer */

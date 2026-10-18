@@ -1,6 +1,7 @@
 """AI Tour Planner — FastAPI backend."""
 
 import os
+import asyncio
 import uuid
 import logging
 from datetime import datetime, timezone, timedelta
@@ -29,7 +30,16 @@ from google.auth.transport import requests as google_requests
 
 from email_service import send_booking_email
 
-from ai_service import generate_itinerary, generate_suggestions, generate_activity_replacement, generate_assistant_reply, generate_refined_itinerary, generate_similar_destinations, generate_trains, compare_destinations
+from ai_service import (
+    generate_itinerary,
+    generate_suggestions,
+    generate_activity_replacement,
+    generate_assistant_reply,
+    generate_refined_itinerary,
+    generate_similar_destinations,
+    generate_trains,
+    generate_destination_comparison,
+)
 from seed import seed_all
 from transport_service import get_trains as fetch_real_trains, get_flights as fetch_real_flights, get_fare as fetch_real_fare, init_db as init_transport_db
 
@@ -218,8 +228,6 @@ class RecommendIn(BaseModel):
     visited_places: List[str] = Field(default_factory=list)
     exclude_destinations: List[str] = Field(default_factory=list)
     preferences: Optional[RecommendPrefsIn] = None
-
-
 # ------------------------------------------------------------
 # FEEDBACK
 # ------------------------------------------------------------
@@ -1077,36 +1085,51 @@ async def compare(
     user=Depends(get_current_user),
 ):
     destinations = body.destinations or []
-    count = len(destinations)
-    if count < 2 or count > 4:
+
+    if len(destinations) < 2 or len(destinations) > 4:
         raise HTTPException(
             status_code=400,
             detail="Select between 2 and 4 places to compare.",
         )
 
-    names = [d.name.strip() for d in destinations if d.name and d.name.strip()]
-    if len(set(n.lower() for n in names)) != count:
-        raise HTTPException(
-            status_code=400,
-            detail="Each compared place must be distinct.",
-        )
+    cleaned = []
+    seen = set()
 
-    prefs = body.preferences.model_dump()
+    for dest in destinations:
+        name = (dest.name or "").strip()
+
+        if not name:
+            raise HTTPException(
+                status_code=400,
+                detail="Each compared place needs a name.",
+            )
+
+        key = name.lower()
+
+        if key in seen:
+            raise HTTPException(
+                status_code=400,
+                detail="Each compared place must be unique.",
+            )
+
+        seen.add(key)
+        cleaned.append(dest.model_dump())
 
     try:
-        result = await compare_destinations(
-            prefs,
-            [d.model_dump() for d in destinations],
+        result = await generate_destination_comparison(
+            body.preferences.model_dump(),
+            cleaned,
         )
     except ValueError as e:
-        logger.exception("Compare validation failed")
+        logger.exception("AI comparison payload invalid")
         raise HTTPException(
             status_code=502,
-            detail=str(e)[:200] or "Could not compare those places. Please try again.",
-        )
+            detail="We couldn't compare those places. Please try again.",
+        ) from e
     except Exception as e:
-        logger.exception("Compare generation failed")
+        logger.exception("AI comparison failed")
         err_msg = str(e).lower()
+
         if (
             "429" in err_msg
             or "quota" in err_msg
@@ -1116,15 +1139,15 @@ async def compare(
         ):
             raise HTTPException(
                 status_code=429,
-                detail="We couldn't compare those places right now. Please try again in a little while.",
-            )
+                detail="The comparison service is busy. Please try again in a little while.",
+            ) from e
+
         raise HTTPException(
             status_code=502,
-            detail="Could not compare those places. Please try again.",
-        )
+            detail="We couldn't compare those places. Please try again.",
+        ) from e
 
     return result
-
 
 # ============================================================
 # SAVE ITINERARY
