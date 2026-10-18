@@ -1,10 +1,11 @@
 """
 Unit tests for Email OTP Authentication in Chalo Ghumne.
 Tests:
-- OTP generation & 10-minute expiry
-- Dev mode terminal logging: "[DEV AUTH OTP]: <code>"
-- Sandboxed localhost testing without requiring an external email provider
-- 5 failed attempts invalidation threshold
+- Real Resend API delivery enforcement
+- 10-minute OTP expiry & MongoDB storage
+- Return only { success: true } (no raw code exposed to client)
+- Error handling with 500 status when Resend delivery fails
+- 5 failed verification attempts invalidation threshold
 - Find-or-create user record and JWT token generation
 """
 
@@ -13,6 +14,9 @@ import io
 import unittest
 from datetime import datetime, timezone, timedelta
 from unittest.mock import patch, MagicMock, AsyncMock
+
+from fastapi import HTTPException
+import resend
 
 from server import (
     UserModel,
@@ -27,24 +31,21 @@ from auth import decode_token
 
 class TestEmailOtpAuth(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
-        os.environ["NODE_ENV"] = "development"
+        os.environ["RESEND_API_KEY"] = "re_test_mock_key_123"
         os.environ["TESTING"] = "1"
 
-    @patch("server.send_otp_email")
     @patch("server.db")
-    async def test_send_otp_generates_and_logs_dev_banner(self, mock_db, mock_send_email):
+    async def test_send_otp_enforces_resend_delivery_and_returns_only_success(self, mock_db):
         mock_db.email_otps.delete_many = AsyncMock()
         mock_db.email_otps.insert_one = AsyncMock()
 
-        captured_stdout = io.StringIO()
-        with patch("sys.stdout", captured_stdout):
+        with patch.object(resend.Emails, "send") as mock_resend_send:
             res = await send_otp(OtpSendIn(email="traveler@example.com"))
 
-        self.assertTrue(res["success"])
-        self.assertEqual(res["email"], "traveler@example.com")
-        self.assertIn("dev_otp", res)
-        self.assertEqual(len(res["dev_otp"]), 6)
-        self.assertTrue(res["dev_otp"].isdigit())
+        # Must return ONLY { "success": True }
+        self.assertEqual(res, {"success": True})
+        self.assertNotIn("dev_otp", res)
+        self.assertNotIn("code", res)
 
         # Verify previous OTPs for this email were cleared
         mock_db.email_otps.delete_many.assert_called_once_with({"email": "traveler@example.com"})
@@ -55,15 +56,41 @@ class TestEmailOtpAuth(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(inserted_doc["email"], "traveler@example.com")
         self.assertEqual(inserted_doc["attempts"], 0)
         self.assertFalse(inserted_doc["verified"])
+        self.assertEqual(len(inserted_doc["code"]), 6)
+        self.assertTrue(inserted_doc["code"].isdigit())
 
         exp = datetime.fromisoformat(inserted_doc["expires_at"])
         now = datetime.now(timezone.utc)
         self.assertTrue(exp > now + timedelta(minutes=9))
         self.assertTrue(exp <= now + timedelta(minutes=10, seconds=5))
 
-        # Check terminal banner was printed
+        # Check Resend API was called directly
+        mock_resend_send.assert_called_once()
+        call_payload = mock_resend_send.call_args[0][0]
+        self.assertEqual(call_payload["from"], "onboarding@resend.dev")
+        self.assertEqual(call_payload["to"], "traveler@example.com")
+        self.assertEqual(call_payload["subject"], "Your Verification Code")
+        self.assertEqual(
+            call_payload["html"],
+            f"<p>Your 6-digit login verification code is: <strong>{inserted_doc['code']}</strong></p>",
+        )
+
+    @patch("server.db")
+    async def test_send_otp_resend_failure_logs_and_raises_500(self, mock_db):
+        mock_db.email_otps.delete_many = AsyncMock()
+        mock_db.email_otps.insert_one = AsyncMock()
+
+        captured_stdout = io.StringIO()
+        with patch("sys.stdout", captured_stdout):
+            with patch.object(resend.Emails, "send", side_effect=Exception("API key invalid or network error")):
+                with self.assertRaises(HTTPException) as cm:
+                    await send_otp(OtpSendIn(email="user@error.com"))
+
+        self.assertEqual(cm.exception.status_code, 500)
+        self.assertIn("Resend delivery failed", cm.exception.detail)
+        # Verify terminal logging
         output = captured_stdout.getvalue()
-        self.assertIn("------------------------\n[DEV AUTH OTP]: " + res["dev_otp"] + "\n------------------------", output)
+        self.assertIn("Resend delivery failed:", output)
 
     @patch("server.db")
     async def test_verify_otp_creates_new_user(self, mock_db):
@@ -127,8 +154,6 @@ class TestEmailOtpAuth(unittest.IsolatedAsyncioTestCase):
 
     @patch("server.db")
     async def test_verify_otp_wrong_code_increments_attempts(self, mock_db):
-        from fastapi import HTTPException
-
         now = datetime.now(timezone.utc)
         active_otp = {
             "_id": "mock_otp_id_3",
@@ -148,19 +173,17 @@ class TestEmailOtpAuth(unittest.IsolatedAsyncioTestCase):
         self.assertIn("3 attempts remaining", cm.exception.detail)
         mock_db.email_otps.update_one.assert_called_once_with(
             {"_id": "mock_otp_id_3"},
-            {"$set": {"attempts": 2}}
+            {"$set": {"attempts": 2}},
         )
 
     @patch("server.db")
     async def test_verify_otp_invalidates_after_5_failed_attempts(self, mock_db):
-        from fastapi import HTTPException
-
         now = datetime.now(timezone.utc)
         active_otp = {
             "_id": "mock_otp_id_4",
             "email": "test@example.com",
             "code": "111111",
-            "attempts": 4, # Next failure makes it 5
+            "attempts": 4,  # Next failure will be 5th attempt
             "expires_at": (now + timedelta(minutes=5)).isoformat(),
             "verified": False,
         }
@@ -177,8 +200,6 @@ class TestEmailOtpAuth(unittest.IsolatedAsyncioTestCase):
 
     @patch("server.db")
     async def test_verify_otp_expired_code_invalidated(self, mock_db):
-        from fastapi import HTTPException
-
         past = datetime.now(timezone.utc) - timedelta(minutes=1)
         expired_otp = {
             "_id": "mock_otp_id_5",

@@ -131,7 +131,6 @@ export function EmailOtpFlow({ mode = "login", onSuccess }) {
   const [googleBusy, setGoogleBusy] = useState(false);
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(45);
-  const [devOtp, setDevOtp] = useState(null);
 
   // 45-second countdown timer for Step 2
   useEffect(() => {
@@ -183,14 +182,10 @@ export function EmailOtpFlow({ mode = "login", onSuccess }) {
 
     setBusy(true);
     try {
-      const data = await sendOtp(cleanEmail);
-      if (data?.dev_otp) {
-        setDevOtp(data.dev_otp);
-        console.log("------------------------\n[DEV AUTH OTP]: " + data.dev_otp + "\n------------------------");
-      }
+      await sendOtp(cleanEmail);
       setCountdown(45);
       setStep("otp");
-      toast.success(data?.message || `Verification code sent to ${cleanEmail}`);
+      toast.success(`Verification code sent to ${cleanEmail}`);
     } catch (err) {
       console.error("Send OTP error:", err);
       toast.error(err?.response?.data?.detail || "Failed to send verification code");
@@ -204,11 +199,7 @@ export function EmailOtpFlow({ mode = "login", onSuccess }) {
     if (countdown > 0 || resending) return;
     setResending(true);
     try {
-      const data = await sendOtp(email.trim().toLowerCase());
-      if (data?.dev_otp) {
-        setDevOtp(data.dev_otp);
-        console.log("------------------------\n[DEV AUTH OTP]: " + data.dev_otp + "\n------------------------");
-      }
+      await sendOtp(email.trim().toLowerCase());
       setCountdown(45);
       toast.success("New verification code sent!");
     } catch (err) {
@@ -356,24 +347,6 @@ export function EmailOtpFlow({ mode = "login", onSuccess }) {
               </button>
             )}
           </div>
-
-          {/* Local Dev Sandbox indicator */}
-          {devOtp && (
-            <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-900" data-testid="dev-otp-banner">
-              <div className="font-semibold text-amber-950">Local Dev Sandbox:</div>
-              <div className="mt-1 flex items-center justify-between gap-2">
-                <span>Code printed to server terminal:</span>
-                <button
-                  type="button"
-                  onClick={() => setOtp(devOtp)}
-                  className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-amber-300 text-amber-900 hover:bg-amber-100 cursor-pointer underline"
-                  title="Click to auto-fill code"
-                >
-                  {devOtp}
-                </button>
-              </div>
-            </div>
-          )}
         </form>
       )}
     </div>

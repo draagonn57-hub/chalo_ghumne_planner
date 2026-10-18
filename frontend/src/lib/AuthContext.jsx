@@ -17,12 +17,12 @@ export function AuthProvider({ children }) {
   }, []);
 
   const sendOtp = async (email) => {
-    const { data } = await api.post("/auth/otp/send", { email });
+    const { data } = await api.post("/auth/send-otp", { email });
     return data;
   };
 
   const verifyOtp = async (email, code) => {
-    const { data } = await api.post("/auth/otp/verify", { email, code });
+    const { data } = await api.post("/auth/verify-otp", { email, code });
     localStorage.setItem("tp_token", data.token);
     setUser(data.user);
     return data;

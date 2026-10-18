@@ -561,34 +561,31 @@ async def send_otp(body: OtpSendIn):
         "created_at": now_iso(),
     })
 
-    # Development sandboxing:
-    # When generating the 6-digit OTP in development mode (process.env.NODE_ENV === 'development')
-    is_dev = (
-        os.environ.get("NODE_ENV") == "development"
-        or os.environ.get("ENV") in ("development", "dev", "test")
-        or os.environ.get("ENVIRONMENT") != "production"
-    )
-
-    if is_dev:
-        terminal_banner = f"------------------------\n[DEV AUTH OTP]: {code}\n------------------------"
-        print(terminal_banner, flush=True)
-        logger.info(terminal_banner)
-
-    # Do not require an external email provider to verify logins on localhost:3000
+    # ── Enforce Real Resend Delivery ──────────────────────────────────────────
+    # Call the Resend API directly with RESEND_API_KEY
+    # No conditional bypass that skips email sending in development
     try:
-        asyncio.create_task(send_otp_email(email, code))
-    except Exception as e:
-        logger.warning(f"Background email send note: {e}")
+        import resend
+        resend.api_key = os.environ.get("RESEND_API_KEY")
+        await asyncio.to_thread(
+            resend.Emails.send,
+            {
+                "from": "onboarding@resend.dev",
+                "to": email,
+                "subject": "Your Verification Code",
+                "html": f"<p>Your 6-digit login verification code is: <strong>{code}</strong></p>",
+            },
+        )
+    except Exception as error:
+        print(f"Resend delivery failed: {error}", flush=True)
+        logger.error("Resend delivery failed: %s", error)
+        raise HTTPException(
+            status_code=500,
+            detail="Resend delivery failed. Please check your RESEND_API_KEY and recipient email.",
+        )
 
-    resp = {
-        "success": True,
-        "message": f"Verification code sent to {email}",
-        "email": email,
-    }
-    if is_dev:
-        resp["dev_otp"] = code
-
-    return resp
+    # Return only { success: True } to client. Do not send raw code.
+    return {"success": True}
 
 
 @api.post("/auth/otp/verify")
