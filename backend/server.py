@@ -29,6 +29,7 @@ from google.auth.transport import requests as google_requests
 
 from ai_service import generate_itinerary, generate_suggestions, generate_activity_replacement, generate_assistant_reply, generate_refined_itinerary, generate_similar_destinations, generate_trains, compare_destinations
 from seed import seed_all
+from transport_service import get_trains as fetch_real_trains, get_flights as fetch_real_flights, get_fare as fetch_real_fare, init_db as init_transport_db
 
 
 # ============================================================
@@ -1824,6 +1825,67 @@ async def root():
 # APP CONFIGURATION
 # ============================================================
 
+
+# ============================================================
+# REAL TRANSPORT — TRAINS, FLIGHTS & ON-DEMAND FARE
+# ============================================================
+
+@api.get("/trains")
+async def trains_endpoint(
+    origin: str,
+    destination: str,
+    date: str,          # YYYY-MM-DD
+    user=Depends(get_current_user),
+):
+    """
+    Fetch real trains (Parse IRCTC API) between two Indian cities.
+    Keys are never returned to the client.
+    """
+    result = await fetch_real_trains(origin, destination, date)
+    return result
+
+
+class FareRequest(BaseModel):
+    train_number: str
+    from_station: str
+    to_station:   str
+    travel_class: str
+
+
+@api.post("/fare")
+async def fare_endpoint(
+    body: FareRequest,
+    user=Depends(get_current_user),
+):
+    """
+    Fetch a single-class fare on demand (Parse IRCTC API).
+    Called only when the user clicks a class chip.
+    Keys are never returned to the client.
+    """
+    result = await fetch_real_fare(
+        body.train_number,
+        body.from_station,
+        body.to_station,
+        body.travel_class,
+    )
+    return result
+
+
+@api.get("/flights")
+async def flights_endpoint(
+    origin: str,
+    destination: str,
+    date: str,          # YYYY-MM-DD
+    user=Depends(get_current_user),
+):
+    """
+    Fetch real flights (SerpAPI Google Flights).
+    Keys are never returned to the client.
+    """
+    result = await fetch_real_flights(origin, destination, date)
+    return result
+
+
 app.include_router(api)
 
 
@@ -1845,6 +1907,9 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def on_startup():
+
+    # Wire the transport service to the shared Motor DB (for persistent cache)
+    init_transport_db(db)
 
     try:
         try:

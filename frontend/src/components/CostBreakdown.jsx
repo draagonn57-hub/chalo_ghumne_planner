@@ -52,7 +52,7 @@ function getNumTravelers(companions) {
   }
 }
 
-function buildBreakdown(it, selectedHotelIndex = 0, selectedFlightIndex = 0, selectedTrainIndex = null, selectedTrainClassIndex = 0) {
+function buildBreakdown(it, selectedHotelIndex = 0, selectedFlightIndex = 0, selectedTrainIndex = null, selectedTrainClassIndex = 0, trainFares = {}) {
   const currency = detectCurrency(it.estimated_total_cost) || "₹";
   const durationDays = it.days?.length || 0;
   const prefs = it.preferences || {};
@@ -104,18 +104,23 @@ function buildBreakdown(it, selectedHotelIndex = 0, selectedFlightIndex = 0, sel
     }
   });
 
-  // Count selected train fare in the transport bucket (mutually exclusive with flight).
+  // Count selected train fare. Read from trainFares (on-demand fetched) first,
+  // fall back to price_int on the class object (legacy/pre-loaded).
   const allTrains = it.trains || [];
   if (selectedTrainIndex !== null && allTrains[selectedTrainIndex]) {
-    const tr = allTrains[selectedTrainIndex];
+    const tr         = allTrains[selectedTrainIndex];
+    const fareKey    = `${selectedTrainIndex}:${selectedTrainClassIndex}`;
+    const fareData   = trainFares[fareKey];
     const chosenClass = tr.classes?.[selectedTrainClassIndex] || tr.classes?.[0];
-    const amt = chosenClass ? parseAmount(chosenClass.price) : 0;
+    const amt = fareData?.price_int
+      || fareData?.fare
+      || (chosenClass ? parseAmount(chosenClass.price) : 0);
     if (amt > 0) {
       data.flights += amt;
       data.items.flights.push({
-        label: `Train: ${tr.name} (${chosenClass?.name || "class"})`,
+        label:  `Train: ${tr.name} (${chosenClass?.name || "class"})`,
         amount: amt,
-        detail: `${tr.from_station} → ${tr.to_station} · ${tr.duration || ""} · Estimated`,
+        detail: `${tr.from_station} → ${tr.to_station} · ${tr.duration || ""}`.trim(),
       });
     }
   }
@@ -340,10 +345,10 @@ function CategoryCard({ catKey, data, currency }) {
   );
 }
 
-export default function CostBreakdown({ itinerary, selectedHotelIndex = 0, selectedFlightIndex = 0, selectedTrainIndex = null, selectedTrainClassIndex = 0 }) {
+export default function CostBreakdown({ itinerary, selectedHotelIndex = 0, selectedFlightIndex = 0, selectedTrainIndex = null, selectedTrainClassIndex = 0, trainFares = {} }) {
   const data = useMemo(
-    () => buildBreakdown(itinerary, selectedHotelIndex, selectedFlightIndex, selectedTrainIndex, selectedTrainClassIndex),
-    [itinerary, selectedHotelIndex, selectedFlightIndex, selectedTrainIndex, selectedTrainClassIndex]
+    () => buildBreakdown(itinerary, selectedHotelIndex, selectedFlightIndex, selectedTrainIndex, selectedTrainClassIndex, trainFares),
+    [itinerary, selectedHotelIndex, selectedFlightIndex, selectedTrainIndex, selectedTrainClassIndex, trainFares]
   );
 
   if (!data.hasData) {
