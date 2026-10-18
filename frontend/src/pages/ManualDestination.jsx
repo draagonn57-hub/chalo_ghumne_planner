@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, MapPin, Search, Sparkles, ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
+import { ArrowLeft, Check, MapPin, Navigation, Search, Sparkles, ArrowRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
 import AILoadingChecklist from "@/components/AILoadingChecklist";
+import CityAutocompleteInput from "@/components/CityAutocompleteInput";
+import { getBudgetEstimates, BUDGET_OPTIONS } from "@/lib/budgetUtils";
 
 const LOADING_STEPS = [
   "Locking in your destination",
@@ -13,13 +16,9 @@ const LOADING_STEPS = [
   "Polishing the details",
 ];
 
-const DURATION_OPTIONS = [3, 5, 7, 10, 14];
+const DURATION_MIN = 1;
+const DURATION_MAX = 21;
 
-const BUDGET_OPTIONS = [
-  { v: "budget", label: "Backpacker" },
-  { v: "mid-range", label: "Balanced" },
-  { v: "luxury", label: "Luxury" },
-];
 
 const COMPANION_OPTIONS = [
   { v: "solo", label: "Solo" },
@@ -39,6 +38,8 @@ const INTEREST_OPTIONS = [
 
 export default function ManualDestination() {
   const nav = useNavigate();
+  const [origin, setOrigin] = useState("");
+  const [originError, setOriginError] = useState("");
   const [query, setQuery] = useState("");
   const [duration, setDuration] = useState(5);
   const [budget, setBudget] = useState("mid-range");
@@ -55,8 +56,23 @@ export default function ManualDestination() {
 
   const canSubmit = query.trim().length >= 2;
 
+  const validate = () => {
+    if (!origin.trim()) {
+      setOriginError("Please enter your starting city");
+      return false;
+    }
+    const normalise = (s) => s.trim().toLowerCase().replace(/,.*$/, "").trim();
+    if (normalise(origin) === normalise(query)) {
+      setOriginError("Origin and destination cannot be the same city");
+      return false;
+    }
+    setOriginError("");
+    return true;
+  };
+
   const generate = async () => {
     if (!canSubmit) return;
+    if (!validate()) return;
     setBusy(true);
     setLoading(true);
     try {
@@ -67,7 +83,7 @@ export default function ManualDestination() {
         interests,
         companions,
         diet: "non-veg",
-        origin: "",
+        origin: origin.trim(),
       });
 
       sessionStorage.setItem("tp_last_itinerary", JSON.stringify(detail));
@@ -115,82 +131,128 @@ export default function ManualDestination() {
           {/* Form fields */}
           <div className="mt-8 space-y-8">
 
+            {/* Origin input — "Starting from" */}
+            <CityAutocompleteInput
+              id="manual-origin"
+              label="Starting from"
+              labelIcon={<Navigation size={12} />}
+              value={origin}
+              onChange={(val) => {
+                setOrigin(val);
+                if (originError) setOriginError("");
+              }}
+              placeholder="Enter your city (e.g. Ahmedabad)"
+              inputIcon={<Search size={18} />}
+              error={originError}
+              onKeyDown={(e) => e.key === "Enter" && canSubmit && generate()}
+              testId="manual-origin-input"
+              disabled={busy}
+            />
+
             {/* Destination input */}
+            <CityAutocompleteInput
+              id="manual-destination"
+              label="Destination"
+              labelIcon={<MapPin size={12} />}
+              value={query}
+              onChange={(val) => setQuery(val)}
+              placeholder="e.g. Tokyo, Paris, Manali…"
+              inputIcon={<Search size={18} />}
+              onKeyDown={(e) => e.key === "Enter" && canSubmit && generate()}
+              testId="manual-destination-input"
+              disabled={busy}
+            />
+
+            {/* Trip length — slider, matches Questionnaire "How many days?" step exactly */}
             <div>
-              <label className="text-xs uppercase tracking-widest text-slate-500 font-semibold flex items-center gap-1.5">
-                <MapPin size={12} />
-                Destination
+              <label
+                htmlFor="manual-duration"
+                className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-3 block"
+              >
+                Trip length
               </label>
-              <div className="relative mt-2">
-                <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <div className="p-2">
+                <div className="flex items-baseline gap-3">
+                  <motion.span
+                    key={duration}
+                    initial={{ scale: 0.9, opacity: 0.5 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.2 }}
+                    className="font-display text-6xl"
+                  >
+                    {duration}
+                  </motion.span>
+                  <span className="text-slate-500">
+                    {duration === 1 ? "day" : "days"}
+                  </span>
+                </div>
                 <input
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="e.g. Tokyo, Paris, Manali…"
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 bg-white focus:border-[#E76F51] focus:outline-none transition-colors"
-                  data-testid="manual-destination-input"
-                  onKeyDown={(e) => e.key === "Enter" && canSubmit && generate()}
+                  id="manual-duration"
+                  type="range"
+                  min={DURATION_MIN}
+                  max={DURATION_MAX}
+                  value={duration}
+                  onChange={(e) => setDuration(Number(e.target.value))}
+                  className="w-full mt-6 accent-[#E76F51]"
+                  data-testid="manual-duration-slider"
+                  aria-label="Trip length in days"
+                  aria-valuemin={DURATION_MIN}
+                  aria-valuemax={DURATION_MAX}
+                  aria-valuenow={duration}
+                  aria-valuetext={`${duration} ${duration === 1 ? "day" : "days"}`}
                 />
+                <div className="flex justify-between text-xs text-slate-400 mt-2">
+                  <span>{DURATION_MIN}</span>
+                  <span>{DURATION_MAX}</span>
+                </div>
               </div>
             </div>
 
-            {/* Trip length */}
+            {/* Budget — full width, 3 cards side by side on sm+ */}
             <div>
-              <div className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-3">
-                Trip length
+              <div
+                role="group"
+                aria-labelledby="manual-budget-label"
+                className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-3"
+                id="manual-budget-label"
+              >
+                Budget
               </div>
+              {(() => {
+                const estimates = getBudgetEstimates(duration);
+                return (
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    {BUDGET_OPTIONS.map((b) => (
+                      <BudgetChoice
+                        key={b.v}
+                        option={b}
+                        estimate={estimates[b.v]}
+                        selected={budget === b.v}
+                        onClick={() => setBudget(b.v)}
+                        testId={`manual-budget-${b.v}`}
+                      />
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Companions — full width row below budget */}
+            <div>
+              <div className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-3">Companions</div>
               <div className="flex flex-wrap gap-2">
-                {DURATION_OPTIONS.map((d) => (
+                {COMPANION_OPTIONS.map((c) => (
                   <button
-                    key={d}
-                    onClick={() => setDuration(d)}
+                    key={c.v}
+                    onClick={() => setCompanions(c.v)}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                      duration === d ? "bg-[#0D5C75] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      companions === c.v ? "bg-[#E76F51] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                     }`}
-                    data-testid={`manual-duration-${d}`}
+                    data-testid={`manual-companions-${c.v}`}
                   >
-                    {d} days
+                    {c.label}
                   </button>
                 ))}
-              </div>
-            </div>
-
-            {/* Budget + Companions */}
-            <div className="grid sm:grid-cols-2 gap-6">
-              <div>
-                <div className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-3">Budget</div>
-                <div className="flex flex-wrap gap-2">
-                  {BUDGET_OPTIONS.map((b) => (
-                    <button
-                      key={b.v}
-                      onClick={() => setBudget(b.v)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                        budget === b.v ? "bg-[#E76F51] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
-                      data-testid={`manual-budget-${b.v}`}
-                    >
-                      {b.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <div className="text-xs uppercase tracking-widest text-slate-500 font-semibold mb-3">Companions</div>
-                <div className="flex flex-wrap gap-2">
-                  {COMPANION_OPTIONS.map((c) => (
-                    <button
-                      key={c.v}
-                      onClick={() => setCompanions(c.v)}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                        companions === c.v ? "bg-[#E76F51] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                      }`}
-                      data-testid={`manual-companions-${c.v}`}
-                    >
-                      {c.label}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
 
@@ -237,5 +299,48 @@ export default function ManualDestination() {
         <AILoadingChecklist steps={LOADING_STEPS} done={false} onDone={() => {}} />
       )}
     </>
+  );
+}
+
+/**
+ * Budget card — identical look to the BudgetChoice used in Questionnaire.
+ * Shows label, subtitle, and a dynamic cost estimate for the selected duration.
+ */
+function BudgetChoice({ option, estimate, selected, onClick, testId }) {
+  const Icon = option.icon;
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      onClick={onClick}
+      data-testid={testId}
+      className={`choice-card text-left relative w-full focus:outline-none focus-visible:ring-2 focus-visible:ring-[#E76F51] focus-visible:ring-offset-2 ${selected ? "selected" : ""}`}
+    >
+      {selected && (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 400, damping: 15 }}
+          className="absolute top-3 right-3 w-5 h-5 rounded-full bg-[#E76F51] text-white flex items-center justify-center"
+        >
+          <Check size={12} strokeWidth={3} />
+        </motion.div>
+      )}
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+        selected ? "bg-[#E76F51] text-white" : "bg-[#0D5C75]/10 text-[#0D5C75]"
+      }`}>
+        <Icon size={20} />
+      </div>
+      <div className="font-display text-xl mt-3">{option.label}</div>
+      <div className="text-slate-500 text-sm mt-0.5">{option.desc}</div>
+      {estimate && (
+        <div className={`mt-2.5 text-xs font-semibold px-2 py-1 rounded-lg inline-block transition-colors ${
+          selected ? "bg-[#E76F51]/15 text-[#E76F51]" : "bg-slate-100 text-slate-500"
+        }`}>
+          ~{estimate}
+        </div>
+      )}
+    </button>
   );
 }

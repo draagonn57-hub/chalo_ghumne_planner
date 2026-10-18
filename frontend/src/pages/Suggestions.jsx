@@ -24,15 +24,14 @@ import SmartImage from "@/components/SmartImage";
 import CompareModal from "@/components/CompareModal";
 import VisitedPlacesInput from "@/components/VisitedPlacesInput";
 import { useAuth } from "@/lib/AuthContext";
+import { BUDGET_OPTIONS as SHARED_BUDGET_OPTIONS } from "@/lib/budgetUtils";
 
 const MAX_COMPARE = 4;
 const EMPTY_SUGGESTIONS = [];
 
-const BUDGET_OPTIONS = [
-  { value: "budget", label: "Backpacker" },
-  { value: "mid-range", label: "Mid-range" },
-  { value: "luxury", label: "Luxury" },
-];
+// Derived from the shared BUDGET_OPTIONS so labels stay consistent.
+// PreferencesRow uses { value, label } — map from the shared { v, label } shape.
+const BUDGET_OPTIONS = SHARED_BUDGET_OPTIONS.map(({ v, label }) => ({ value: v, label }));
 
 const COMPANION_OPTIONS = [
   { value: "solo", label: "Solo" },

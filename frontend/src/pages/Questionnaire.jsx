@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { Compass, Utensils, UtensilsCrossed, Wallet, Sparkles, Users, Mountain, Music4, Landmark, Save as Waves, Leaf, ChefHat, ArrowLeft, ArrowRight, Check, Calendar, Globe, MapPin } from "lucide-react";
+import { Compass, Utensils, UtensilsCrossed, Sparkles, Users, Mountain, Music4, Landmark, Save as Waves, Leaf, ChefHat, ArrowLeft, ArrowRight, Check, Calendar, Globe, MapPin } from "lucide-react";
 import AILoadingChecklist from "@/components/AILoadingChecklist";
+import { getBudgetEstimates, BUDGET_OPTIONS } from "@/lib/budgetUtils";
 
 const SUGGESTION_STEPS = [
   "Understanding your preferences",
@@ -53,43 +54,8 @@ const STEPS = [
   },
 ];
 
-/**
- * Returns per-person approximate budget ranges based on number of days.
- * Scales linearly from a base (2-day) rate.
- *
- * Tier breakpoints (per person):
- *   Backpacker : ~2,000–4,000 ₹/day  → range shown: (days × 2k) to (days × 4k), min 7k–10k
- *   Moderate   : ~4,500–9,000 ₹/day  → range shown: (days × 4.5k) to (days × 9k), min 22k–25k
- *   Luxury     : ~10,000+ ₹/day      → shown as (days × 10k)+ 
- */
-function getBudgetEstimates(days) {
-  const d = Math.max(2, days || 5);
-  // Per user spec:
-  //   3 days → backpacker 7–22k, moderate 22–55k, luxury 55k+
-  //   5 days → backpacker 10–25k, moderate 25–60k, luxury 60k+
-  const backpackerLow  = Math.round(Math.max(7000,  d * 2000)  / 1000) * 1000;
-  const backpackerHigh = Math.round(Math.max(22000, d * 5000)  / 1000) * 1000;
-  const moderateLow    = Math.round(Math.max(22000, d * 5000)  / 1000) * 1000;
-  const moderateHigh   = Math.round(Math.max(55000, d * 12000) / 1000) * 1000;
-  const luxuryLow      = Math.round(Math.max(55000, d * 12000) / 1000) * 1000;
 
-  const fmt = (n) =>
-    n >= 100000
-      ? `₹${(n / 100000).toFixed(1).replace(/\.0$/, "")} L`
-      : `₹${(n / 1000).toFixed(0)}k`;
 
-  return {
-    budget:      `${fmt(backpackerLow)} – ${fmt(backpackerHigh)} / person`,
-    "mid-range": `${fmt(moderateLow)} – ${fmt(moderateHigh)} / person`,
-    luxury:      `${fmt(luxuryLow)}+ / person`,
-  };
-}
-
-const BUDGET_OPTIONS = [
-  { v: "budget",    label: "Low Budget",    desc: "Affordable stays & local food",    icon: Wallet },
-  { v: "mid-range", label: "Medium Budget", desc: "Comfortable stays & experiences",  icon: Wallet },
-  { v: "luxury",    label: "High Budget",   desc: "Premium stays & fine dining",      icon: Wallet },
-];
 
 const DIET_OPTIONS = [
   { v: "veg", label: "Vegetarian", desc: "Plant-forward menus", icon: Leaf },
