@@ -10,12 +10,16 @@ import {
 import {
   Plane, BedDouble, Star, Check, Plus, Minus, ArrowRight, ArrowLeft,
   Car, Shield, MapPin, Landmark, Mountain, Building2, Users, Calendar,
-  CreditCard, ChevronRight, Lock,
+  CreditCard, ChevronRight, Lock, Train, AlertTriangle,
 } from "lucide-react";
+import {
+  useTransport, resolveOrigin, resolveDestination, resolveTravelDate, isDateFuture,
+} from "@/lib/useTransport";
+import { useTrainFares } from "@/lib/useFare";
 
 const SERVICE_ICONS = { Car, Shield, MapPin, Landmark, Mountain, Building2 };
 
-const STEPS = ["Flight", "Hotel", "Room", "Services", "Travelers", "Review"];
+const STEPS = ["Transport", "Hotel", "Room", "Services", "Travelers", "Review"];
 
 export default function Booking() {
   const nav = useNavigate();
@@ -26,6 +30,8 @@ export default function Booking() {
 
   // selections
   const [selectedFlight, setSelectedFlight] = useState(null);
+  const [selectedTrain, setSelectedTrain] = useState(null);
+  const [transportMode, setTransportMode] = useState("flight"); // "flight" | "train"
   const [selectedHotel, setSelectedHotel] = useState(null);
   const [roomType, setRoomType] = useState(ROOM_TYPES[0]);
   const [numRooms, setNumRooms] = useState(1);
@@ -69,9 +75,8 @@ export default function Booking() {
   function initFromItinerary(it) {
     const nights = it.days?.length || 1;
     setNumNights(nights);
-    if (it.flights?.length > 0) {
-      setSelectedFlight({ ...it.flights[0], _source: "itinerary" });
-    }
+    // Don't pre-select flight/train here — real data loads via useTransport
+    // Only pre-select hotel from the itinerary
     if (it.hotels?.length > 0) {
       setSelectedHotel(it.hotels[0]);
     }
@@ -81,20 +86,55 @@ export default function Booking() {
   const dest = it?.destinations?.[0] || {};
   const preferences = itinDoc?.preferences || {};
 
+  // ── Real transport data from Parse IRCTC + SerpAPI ──────────────────────
+  const isDomestic = (it?.destinations || []).every((d) => {
+    const country = (d?.country || "").toLowerCase().trim();
+    return country === "india" || country === "in";
+  });
+
+  const {
+    trains: realTrains,
+    trainError,
+    trainsLoading,
+    flights: realFlights,
+    flightError,
+    flightsLoading,
+    travelDate,
+    needsDate,
+    setOverrideDate,
+  } = useTransport(it, preferences, isDomestic);
+
+  // On-demand fare fetching for train class chips
+  const { fares: trainFares, fetchFare } = useTrainFares(realTrains);
+
   const serviceCatalog = useMemo(() => buildServiceCatalog({ destinations: it?.destinations, preferences }), [it, preferences]);
 
   const pricing = useMemo(() => {
-    const flightPrice = selectedFlight ? parsePrice(selectedFlight.price) : 0;
+    let transportPrice = 0;
+    if (transportMode === "flight" && selectedFlight) {
+      transportPrice = parsePrice(selectedFlight.price);
+    } else if (transportMode === "train" && selectedTrain) {
+      // Find the train index in realTrains and the selected class index
+      const trainIdx = realTrains.findIndex(
+        (t) => t.number === selectedTrain.number
+      );
+      const classIdx = selectedTrain._selectedClassIdx ?? 0;
+      const fareKey  = `${trainIdx}:${classIdx}`;
+      const fareData = trainFares[fareKey];
+      transportPrice = fareData?.price_int
+        ?? parsePrice(selectedTrain.classes?.[classIdx]?.price || "0");
+    }
     const hotelPerNight = selectedHotel ? parsePrice(selectedHotel.price_per_night) : 0;
     return calcPricing({
-      flightPrice,
+      flightPrice: transportPrice,
       hotelPerNight,
       roomMultiplier: roomType.multiplier,
       numRooms,
       numNights,
       addons,
     });
-  }, [selectedFlight, selectedHotel, roomType, numRooms, numNights, addons]);
+  }, [selectedFlight, selectedTrain, transportMode, realTrains, trainFares,
+      selectedHotel, roomType, numRooms, numNights, addons]);
 
   const toggleAddon = (service) => {
     setAddons((prev) => {
@@ -123,7 +163,7 @@ export default function Booking() {
   };
 
   const canProceed = () => {
-    if (step === 0) return !!selectedFlight;
+    if (step === 0) return transportMode === "flight" ? !!selectedFlight : !!selectedTrain;
     if (step === 1) return !!selectedHotel;
     if (step === 2) return !!roomType && numRooms > 0;
     if (step === 3) return true;
@@ -159,7 +199,9 @@ export default function Booking() {
       travel_dates: { duration_days: it?.days?.length || 0, origin: preferences.origin || "" },
       duration_days: it?.days?.length || 0,
       origin: preferences.origin || "",
-      flight: selectedFlight,
+      flight: transportMode === "flight" ? selectedFlight : null,
+      train: transportMode === "train" ? selectedTrain : null,
+      transport_mode: transportMode,
       hotel: selectedHotel,
       room: roomType,
       num_rooms: numRooms,
@@ -171,8 +213,6 @@ export default function Booking() {
       transaction_id: "",
       booking_status: "pending",
       itinerary_snapshot: itinSnapshot,
-      transport_mode: "flight",
-      train: null,
     };
     sessionStorage.setItem("tp_pending_booking", JSON.stringify(bookingPayload));
     nav("/booking/checkout");
@@ -234,12 +274,38 @@ export default function Booking() {
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
             >
-              {step === 0 && <FlightStep it={it} selected={selectedFlight} onSelect={setSelectedFlight} />}
+              {step === 0 && (
+                <TransportStep
+                  realFlights={realFlights}
+                  realTrains={realTrains}
+                  flightsLoading={flightsLoading}
+                  trainsLoading={trainsLoading}
+                  flightError={flightError}
+                  trainError={trainError}
+                  needsDate={needsDate}
+                  travelDate={travelDate}
+                  onSetDate={setOverrideDate}
+                  isDomestic={isDomestic}
+                  selectedFlight={selectedFlight}
+                  onSelectFlight={(f) => { setSelectedFlight(f); setTransportMode("flight"); setSelectedTrain(null); }}
+                  selectedTrain={selectedTrain}
+                  onSelectTrain={(tr, idx, classIdx) => {
+                    setSelectedTrain({ ...tr, _selectedClassIdx: classIdx ?? 0 });
+                    setTransportMode("train");
+                    setSelectedFlight(null);
+                    if (classIdx !== undefined) fetchFare(idx, classIdx, tr);
+                  }}
+                  transportMode={transportMode}
+                  setTransportMode={setTransportMode}
+                  trainFares={trainFares}
+                  fetchFare={fetchFare}
+                />
+              )}
               {step === 1 && <HotelStep it={it} selected={selectedHotel} onSelect={setSelectedHotel} />}
               {step === 2 && <RoomStep roomType={roomType} setRoomType={setRoomType} numRooms={numRooms} setNumRooms={setNumRooms} numNights={numNights} setNumNights={setNumNights} hotelPerNight={selectedHotel ? parsePrice(selectedHotel.price_per_night) : 0} />}
               {step === 3 && <ServicesStep catalog={serviceCatalog} addons={addons} onToggle={toggleAddon} />}
               {step === 4 && <TravelersStep travelers={travelers} setTravelers={setTravelers} setNumTravelers={setNumTravelers} updatePassenger={updatePassenger} />}
-              {step === 5 && <ReviewStep dest={dest} it={it} selectedFlight={selectedFlight} selectedHotel={selectedHotel} roomType={roomType} numRooms={numRooms} numNights={numNights} addons={addons} travelers={travelers} pricing={pricing} onEdit={setStep} />}
+              {step === 5 && <ReviewStep dest={dest} it={it} selectedFlight={transportMode === "flight" ? selectedFlight : null} selectedTrain={transportMode === "train" ? selectedTrain : null} transportMode={transportMode} selectedHotel={selectedHotel} roomType={roomType} numRooms={numRooms} numNights={numNights} addons={addons} travelers={travelers} pricing={pricing} onEdit={setStep} />}
             </motion.div>
           </AnimatePresence>
 
@@ -261,7 +327,9 @@ export default function Booking() {
         {/* Sticky summary */}
         <div className="lg:sticky lg:top-24 lg:self-start">
           <BookingSummary
-            selectedFlight={selectedFlight}
+            selectedFlight={transportMode === "flight" ? selectedFlight : null}
+            selectedTrain={transportMode === "train" ? selectedTrain : null}
+            transportMode={transportMode}
             selectedHotel={selectedHotel}
             roomType={roomType}
             numRooms={numRooms}
@@ -269,7 +337,7 @@ export default function Booking() {
             addons={addons}
             pricing={pricing}
             onCheckout={handleCheckout}
-            canCheckout={!!selectedFlight && !!selectedHotel}
+            canCheckout={transportMode === "flight" ? !!selectedFlight && !!selectedHotel : !!selectedTrain && !!selectedHotel}
           />
         </div>
       </div>
@@ -278,51 +346,252 @@ export default function Booking() {
   );
 }
 
-/* ── Flight Step ── */
-function FlightStep({ it, selected, onSelect }) {
-  const flights = it.flights || [];
-  const fallbackFlights = [
-    { airline: "SkyJet Airways", from: "Delhi (DEL)", to: "Destination", duration: "2h 15m", stops: "Non-stop", price: "₹8,500", _source: "demo" },
-    { airline: "Air Vista", from: "Mumbai (BOM)", to: "Destination", duration: "3h 10m", stops: "1 stop", price: "₹6,200", _source: "demo" },
-  ];
-  const list = flights.length > 0 ? flights : fallbackFlights;
+/* ── Transport Step (Flights + Trains — real API data) ── */
+function TransportStep({
+  realFlights, realTrains,
+  flightsLoading, trainsLoading,
+  flightError, trainError,
+  needsDate, travelDate, onSetDate,
+  isDomestic,
+  selectedFlight, onSelectFlight,
+  selectedTrain, onSelectTrain,
+  transportMode, setTransportMode,
+  trainFares, fetchFare,
+}) {
+  const hasBoth = realFlights.length > 0 && realTrains.length > 0 && isDomestic;
 
   return (
     <div>
       <p className="eyebrow">Step 1</p>
-      <h2 className="font-display text-3xl mt-2">Choose your flight</h2>
-      <p className="text-slate-500 mt-2 text-sm">
-        {flights.length > 0 ? "Flights from your itinerary." : "Demo flight options — your itinerary didn't include specific flights."}
-      </p>
-      <div className="mt-6 space-y-4">
-        {list.map((f, i) => {
-          const isSel = selected?.airline === f.airline && selected?.from === f.from;
-          return (
-            <motion.button
-              key={i}
-              whileHover={{ y: -2 }}
-              whileTap={{ scale: 0.99 }}
-              onClick={() => onSelect(f)}
-              className={`tp-card p-5 w-full text-left flex items-center gap-4 transition-all ${isSel ? "ring-2 ring-[#E76F51] border-[#E76F51]" : ""}`}
-              data-testid={`flight-option-${i}`}
-            >
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 ${isSel ? "bg-[#E76F51] text-white" : "bg-[#0D5C75]/10 text-[#0D5C75]"}`}>
-                <Plane size={22} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="font-semibold text-lg">{f.airline}</div>
-                <div className="text-sm text-slate-500">{f.from} → {f.to}</div>
-                <div className="text-xs text-slate-400 mt-0.5">{f.duration} · {f.stops}</div>
-              </div>
-              <div className="text-right shrink-0">
-                <div className="text-[#0D5C75] font-bold text-lg">{f.price}</div>
-                {f._source === "demo" && <div className="text-xs text-slate-400">Demo</div>}
-              </div>
-              {isSel && <div className="w-7 h-7 rounded-full bg-[#E76F51] text-white flex items-center justify-center shrink-0"><Check size={16} /></div>}
-            </motion.button>
-          );
-        })}
-      </div>
+      <h2 className="font-display text-3xl mt-2">Choose your transport</h2>
+
+      {/* Date picker when date is missing or past */}
+      {needsDate && (
+        <div className="mt-5 tp-card p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="flex-1">
+            <p className="text-sm font-medium text-slate-700">Travel date needed</p>
+            <p className="text-xs text-slate-400 mt-0.5">
+              Enter a future travel date to load live trains and flights.
+            </p>
+          </div>
+          <input
+            type="date"
+            min={new Date().toISOString().split("T")[0]}
+            onChange={(e) => e.target.value && onSetDate(e.target.value)}
+            className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C75]/30 focus:border-[#0D5C75]"
+          />
+        </div>
+      )}
+
+      {!needsDate && (
+        <>
+          {/* Flights / Trains tab toggle — only for domestic */}
+          {isDomestic && (
+            <div className="mt-5 flex items-center gap-1 p-1 bg-slate-100 rounded-full w-fit">
+              <button
+                onClick={() => setTransportMode("flight")}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  transportMode === "flight" ? "bg-white text-[#0D5C75] shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+                data-testid="booking-tab-flights"
+              >
+                <Plane size={14} /> Flights
+                {transportMode === "flight" && selectedFlight && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#0D5C75] ml-0.5" />
+                )}
+              </button>
+              <button
+                onClick={() => setTransportMode("train")}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
+                  transportMode === "train" ? "bg-white text-[#0D5C75] shadow-sm" : "text-slate-500 hover:text-slate-700"
+                }`}
+                data-testid="booking-tab-trains"
+              >
+                <Train size={14} /> Trains
+                {transportMode === "train" && selectedTrain && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#0D5C75] ml-0.5" />
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* ── Flights ── */}
+          {transportMode === "flight" && (
+            <div className="mt-6 space-y-4">
+              <p className="text-slate-500 text-sm">Live flight options for your route.</p>
+              {flightsLoading && (
+                <div className="space-y-3">
+                  {[1, 2].map((n) => <div key={n} className="skeleton h-20 rounded-[1.25rem]" />)}
+                </div>
+              )}
+              {!flightsLoading && flightError && (
+                <div className="tp-card p-4 flex items-center gap-2 text-sm text-slate-500">
+                  <AlertTriangle size={16} className="text-amber-500 shrink-0" />
+                  {flightError}
+                </div>
+              )}
+              {!flightsLoading && !flightError && realFlights.length === 0 && (
+                <div className="tp-card p-4 text-sm text-slate-500">No flights found for this route and date.</div>
+              )}
+              {!flightsLoading && realFlights.map((f, i) => {
+                const isSel = transportMode === "flight" &&
+                  selectedFlight?.flight_number === f.flight_number &&
+                  selectedFlight?.airline === f.airline;
+                return (
+                  <motion.button
+                    key={i}
+                    whileHover={{ y: -2 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => onSelectFlight(f)}
+                    className={`tp-card p-5 w-full text-left flex items-center gap-4 transition-all ${isSel ? "ring-2 ring-[#E76F51] border-[#E76F51]" : ""}`}
+                    data-testid={`flight-option-${i}`}
+                  >
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${isSel ? "bg-[#E76F51] text-white" : "bg-[#0D5C75]/10 text-[#0D5C75]"}`}>
+                      {f.airline_logo
+                        ? <img src={f.airline_logo} alt={f.airline} className="w-8 h-8 object-contain" />
+                        : <Plane size={22} />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-base">{f.airline}</div>
+                      {f.flight_number && <div className="text-xs text-slate-400 font-mono">{f.flight_number}</div>}
+                      <div className="text-sm text-slate-500">
+                        {f.departure_time && f.arrival_time
+                          ? `${f.departure_time} → ${f.arrival_time}`
+                          : `${f.from} → ${f.to}`}
+                      </div>
+                      <div className="text-xs text-slate-400 mt-0.5">
+                        {[f.duration, f.stops].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      {f.price
+                        ? <div className="text-[#0D5C75] font-bold text-lg">{f.price}</div>
+                        : <a href="https://www.google.com/travel/flights" target="_blank" rel="noopener noreferrer" className="text-xs underline text-slate-400">Check fare</a>}
+                    </div>
+                    {isSel && <div className="w-7 h-7 rounded-full bg-[#E76F51] text-white flex items-center justify-center shrink-0"><Check size={16} /></div>}
+                  </motion.button>
+                );
+              })}
+            </div>
+          )}
+
+          {/* ── Trains ── */}
+          {transportMode === "train" && isDomestic && (
+            <div className="mt-6 space-y-4">
+              <p className="text-slate-500 text-sm">Live trains for your route — fares load when you pick a class.</p>
+              {trainsLoading && (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((n) => <div key={n} className="skeleton h-28 rounded-[1.25rem]" />)}
+                </div>
+              )}
+              {!trainsLoading && trainError && (
+                <div className="tp-card p-4 flex items-center gap-2 text-sm text-slate-500">
+                  <AlertTriangle size={16} className="text-amber-500 shrink-0" />
+                  {trainError}
+                </div>
+              )}
+              {!trainsLoading && !trainError && realTrains.length === 0 && (
+                <div className="tp-card p-4 text-sm text-slate-500">No trains found for this route and date.</div>
+              )}
+              {!trainsLoading && realTrains.map((tr, trainIdx) => {
+                const isSelTrain = transportMode === "train" && selectedTrain?.number === tr.number;
+                // Which class is currently selected for this train card?
+                const activeClassIdx = isSelTrain ? (selectedTrain._selectedClassIdx ?? 0) : 0;
+                const activeFareKey  = `${trainIdx}:${activeClassIdx}`;
+                const activeFare     = trainFares[activeFareKey];
+
+                return (
+                  <div
+                    key={trainIdx}
+                    className={`tp-card p-5 flex flex-col gap-3 transition-all ${isSelTrain ? "ring-2 ring-[#E76F51]" : ""}`}
+                    data-testid={`train-option-${trainIdx}`}
+                  >
+                    {/* Train header */}
+                    <div className="flex items-start gap-3">
+                      <div className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${isSelTrain ? "bg-[#E76F51] text-white" : "bg-[#0D5C75]/10 text-[#0D5C75]"}`}>
+                        <Train size={20} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-base leading-tight">{tr.name}</div>
+                        <div className="text-xs text-slate-400 font-mono">#{tr.number}</div>
+                        <div className="text-sm text-slate-500 mt-0.5">
+                          {tr.from_station} → {tr.to_station}
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          {tr.departure_time} → {tr.arrival_time} · {tr.duration}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        {activeFare?.loading && <div className="text-xs text-slate-400 animate-pulse">Loading…</div>}
+                        {activeFare?.price && !activeFare.loading && (
+                          <>
+                            <div className="text-[#0D5C75] font-bold text-lg">{activeFare.price}</div>
+                            <div className="text-xs text-slate-400">{tr.classes?.[activeClassIdx]?.name} class</div>
+                          </>
+                        )}
+                        {!activeFare?.price && !activeFare?.loading && (
+                          <div className="text-xs text-slate-400">Pick a class</div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Class chips — clicking fetches fare AND selects train */}
+                    {tr.classes?.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {tr.classes.map((cls, classIdx) => {
+                          const fareKey  = `${trainIdx}:${classIdx}`;
+                          const fareData = trainFares[fareKey];
+                          const isActiveChip = isSelTrain && activeClassIdx === classIdx;
+                          const chipLabel = fareData?.loading
+                            ? `${cls.name} · …`
+                            : fareData?.price
+                              ? `${cls.name} · ${fareData.price}`
+                              : cls.name;
+                          return (
+                            <button
+                              key={classIdx}
+                              onClick={() => {
+                                // Select this train with this class
+                                onSelectTrain(tr, trainIdx, classIdx);
+                              }}
+                              className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                                isActiveChip
+                                  ? "bg-[#E76F51] text-white border-[#E76F51]"
+                                  : "border-slate-200 text-slate-600 hover:border-[#0D5C75]/40 hover:text-[#0D5C75]"
+                              }`}
+                              data-testid={`booking-train-${trainIdx}-class-${classIdx}`}
+                            >
+                              {chipLabel}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Runs on */}
+                    {tr.runs_on && (
+                      <div className="flex flex-wrap gap-1">
+                        {["mon","tue","wed","thu","fri","sat","sun"].map((d) => (
+                          <span
+                            key={d}
+                            className={`text-[10px] px-1.5 py-0.5 rounded font-medium uppercase ${
+                              tr.runs_on[d]
+                                ? "bg-[#0D5C75]/10 text-[#0D5C75]"
+                                : "bg-slate-100 text-slate-300"
+                            }`}
+                          >
+                            {d}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -598,7 +867,9 @@ function Field({ label, value, onChange, type = "text", testId, error }) {
 }
 
 /* ── Review Step ── */
-function ReviewStep({ dest, it, selectedFlight, selectedHotel, roomType, numRooms, numNights, addons, travelers, pricing, onEdit }) {
+function ReviewStep({ dest, it, selectedFlight, selectedTrain, transportMode, selectedHotel, roomType, numRooms, numNights, addons, travelers, pricing, onEdit }) {
+  const transportLabel = transportMode === "train" ? "Train" : "Flight";
+  const transportItem  = transportMode === "train" ? selectedTrain : selectedFlight;
   return (
     <div>
       <p className="eyebrow">Step 6</p>
@@ -612,10 +883,21 @@ function ReviewStep({ dest, it, selectedFlight, selectedHotel, roomType, numRoom
           <Row label="Origin" value={it?.preferences?.origin || "—"} />
         </ReviewCard>
 
-        <ReviewCard title="Flight" onEdit={() => onEdit(0)}>
-          <Row label="Airline" value={selectedFlight?.airline || "—"} />
-          <Row label="Route" value={selectedFlight ? `${selectedFlight.from} → ${selectedFlight.to}` : "—"} />
-          <Row label="Price" value={selectedFlight?.price || "—"} />
+        <ReviewCard title={transportLabel} onEdit={() => onEdit(0)}>
+          {transportMode === "flight" ? (
+            <>
+              <Row label="Airline" value={selectedFlight?.airline || "—"} />
+              <Row label="Route" value={selectedFlight ? `${selectedFlight.from} → ${selectedFlight.to}` : "—"} />
+              <Row label="Price" value={selectedFlight?.price || "—"} />
+            </>
+          ) : (
+            <>
+              <Row label="Train" value={selectedTrain?.name || "—"} />
+              <Row label="Number" value={selectedTrain?.number ? `#${selectedTrain.number}` : "—"} />
+              <Row label="Route" value={selectedTrain ? `${selectedTrain.from_station} → ${selectedTrain.to_station}` : "—"} />
+              <Row label="Departure" value={selectedTrain?.departure_time || "—"} />
+            </>
+          )}
         </ReviewCard>
 
         <ReviewCard title="Hotel & Room" onEdit={() => onEdit(1)}>
@@ -636,7 +918,7 @@ function ReviewStep({ dest, it, selectedFlight, selectedHotel, roomType, numRoom
         </ReviewCard>
 
         <ReviewCard title="Price Breakdown">
-          <Row label="Flight" value={formatINR(pricing.flight)} />
+          <Row label={transportLabel} value={formatINR(pricing.flight)} />
           <Row label={`Hotel (${numRooms} room${numRooms > 1 ? "s" : ""} × ${numNights} night${numNights > 1 ? "s" : ""})`} value={formatINR(pricing.hotelTotal)} />
           <Row label="Add-ons" value={formatINR(pricing.addonsTotal)} />
           <Row label="Subtotal" value={formatINR(pricing.subtotal)} />
@@ -673,14 +955,19 @@ function Row({ label, value, bold }) {
 }
 
 /* ── Booking Summary (sticky sidebar) ── */
-function BookingSummary({ selectedFlight, selectedHotel, roomType, numRooms, numNights, addons, pricing, onCheckout, canCheckout }) {
+function BookingSummary({ selectedFlight, selectedTrain, transportMode, selectedHotel, roomType, numRooms, numNights, addons, pricing, onCheckout, canCheckout }) {
+  const transportPrice = transportMode === "train"
+    ? (selectedTrain?.classes?.[0]?.price || "—")
+    : (selectedFlight ? selectedFlight.price : "Not selected");
+  const transportLabel = transportMode === "train" ? "Train" : "Flight";
+
   return (
     <div className="tp-card p-6" data-testid="booking-summary">
       <h3 className="font-display text-2xl">Booking Summary</h3>
       <div className="mt-5 space-y-3 text-sm">
         <div className="flex justify-between">
-          <span className="text-slate-500">Flight</span>
-          <span className="font-medium">{selectedFlight ? selectedFlight.price : "Not selected"}</span>
+          <span className="text-slate-500">{transportLabel}</span>
+          <span className="font-medium">{transportPrice}</span>
         </div>
         <div className="flex justify-between">
           <span className="text-slate-500">Hotel</span>
@@ -718,7 +1005,11 @@ function BookingSummary({ selectedFlight, selectedHotel, roomType, numRooms, num
       >
         <Lock size={16} /> Continue to Checkout
       </button>
-      {!canCheckout && <p className="text-xs text-slate-400 text-center mt-2">Select a flight and hotel to continue</p>}
+      {!canCheckout && (
+        <p className="text-xs text-slate-400 text-center mt-2">
+          Select a {transportMode === "train" ? "train" : "flight"} and hotel to continue
+        </p>
+      )}
     </div>
   );
 }

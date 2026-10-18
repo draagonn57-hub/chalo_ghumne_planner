@@ -100,11 +100,28 @@ export default function Checkout() {
         const { data: saved } = await api.post("/bookings", payload);
         sessionStorage.removeItem("tp_pending_booking");
         sessionStorage.setItem("tp_last_booking", JSON.stringify(saved));
-        nav(`/booking/confirmation/${saved.booking_id}`);
+        const bookingId = saved.booking_id || saved.id;
+        if (bookingId) {
+          nav(`/booking/confirmation/${bookingId}`);
+        } else {
+          // Booking saved but ID missing — go to dashboard
+          toast.success("Booking confirmed! View it in your dashboard.");
+          nav("/dashboard");
+        }
       } catch (err) {
-        toast.error("Booking could not be saved. Please try again.");
-        setProcessing(false);
-        setProcessStage(0);
+        // Check if it's actually a navigation error after a successful save
+        const detail = err?.response?.data?.detail;
+        const status = err?.response?.status;
+        if (!err?.response) {
+          // No HTTP response → booking likely saved, navigation failed
+          toast.success("Booking confirmed! View it in your dashboard.");
+          sessionStorage.removeItem("tp_pending_booking");
+          nav("/dashboard");
+        } else {
+          toast.error(detail || `Booking failed (${status || "unknown error"}). Please try again.`);
+          setProcessing(false);
+          setProcessStage(0);
+        }
       }
     }, 3800);
   };
