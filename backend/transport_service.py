@@ -319,11 +319,31 @@ CITY_TO_IATA: dict[str, str] = {
     "shimla":             "SLV",
 }
 
+def _normalize_city(city: str) -> str:
+    """
+    Normalize a city string for lookup.
+    Handles formats like:
+      "Surat"
+      "Surat, Gujarat"
+      "Surat, Gujarat, India"
+      "Surat (STV)"
+    Extracts just the primary city name.
+    """
+    if not city:
+        return ""
+    # Take only the part before the first comma
+    primary = city.split(",")[0].strip()
+    # Remove parenthetical suffixes like "(STV)"
+    primary = primary.split("(")[0].strip()
+    return primary.lower()
+
+
 def city_to_station(city: str) -> Optional[str]:
-    return CITY_TO_STATION.get(city.lower().strip())
+    return CITY_TO_STATION.get(_normalize_city(city))
+
 
 def city_to_iata(city: str) -> Optional[str]:
-    return CITY_TO_IATA.get(city.lower().strip())
+    return CITY_TO_IATA.get(_normalize_city(city))
 
 # ── Weekday helper ─────────────────────────────────────────────────────────────
 
