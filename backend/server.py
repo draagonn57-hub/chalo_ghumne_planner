@@ -42,7 +42,14 @@ from ai_service import (
     generate_destination_comparison,
 )
 from seed import seed_all
-from transport_service import get_trains as fetch_real_trains, get_flights as fetch_real_flights, get_fare as fetch_real_fare, init_db as init_transport_db
+from transport_service import (
+    get_trains as fetch_real_trains,
+    get_flights as fetch_real_flights,
+    get_fare as fetch_real_fare,
+    init_db as init_transport_db,
+    start_bridge as start_railkit_bridge,
+    stop_bridge as stop_railkit_bridge,
+)
 
 
 # ============================================================
@@ -2337,6 +2344,7 @@ class FareRequest(BaseModel):
     from_station: str
     to_station:   str
     travel_class: str
+    travel_date:  Optional[str] = None   # YYYY-MM-DD or DD-MM-YYYY
 
 
 @api.post("/fare")
@@ -2345,7 +2353,7 @@ async def fare_endpoint(
     user=Depends(get_current_user),
 ):
     """
-    Fetch a single-class fare on demand (Parse IRCTC API).
+    Fetch a single-class fare on demand (Railkit SDK via bridge).
     Called only when the user clicks a class chip.
     Keys are never returned to the client.
     """
@@ -2354,6 +2362,7 @@ async def fare_endpoint(
         body.from_station,
         body.to_station,
         body.travel_class,
+        body.travel_date or "",
     )
     return result
 
@@ -2398,6 +2407,9 @@ async def on_startup():
     # Wire the transport service to the shared Motor DB (for persistent cache)
     init_transport_db(db)
 
+    # Start the Railkit Node.js bridge for live train data
+    start_railkit_bridge()
+
     try:
         try:
             await db.users.create_index("googleId", unique=True, sparse=True)
@@ -2422,4 +2434,5 @@ async def on_startup():
 @app.on_event("shutdown")
 async def shutdown_db_client():
 
+    stop_railkit_bridge()
     client.close()

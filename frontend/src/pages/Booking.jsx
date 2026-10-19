@@ -105,7 +105,7 @@ export default function Booking() {
   } = useTransport(it, preferences, isDomestic);
 
   // On-demand fare fetching for train class chips
-  const { fares: trainFares, fetchFare } = useTrainFares(realTrains);
+  const { fares: trainFares, fetchFare } = useTrainFares(realTrains, travelDate);
 
   const serviceCatalog = useMemo(() => buildServiceCatalog({ destinations: it?.destinations, preferences }), [it, preferences]);
 

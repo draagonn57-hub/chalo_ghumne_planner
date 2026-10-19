@@ -1,0 +1,13 @@
+{
+  "name": "railkit-bridge",
+  "version": "1.0.0",
+  "description": "Thin HTTP bridge exposing Railkit SDK to the Python backend",
+  "main": "server.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "railkit": "^6.0.2"
+  }
+}

@@ -1,17 +1,19 @@
 """
 transport_service.py
-Real train (Parse IRCTC API) and flight (SerpAPI) data for Chalo Ghumne.
+Real train (Railkit SDK via local bridge) and flight (SerpAPI) data.
+
+Architecture:
+  Python backend  →  local HTTP  →  railkit-bridge (Node.js)  →  Railkit SDK  →  Indian Railways
+  Python backend  →  HTTPS       →  SerpAPI Google Flights
 
 Rules:
-- API keys are read from env vars only; NEVER logged or returned to client.
-- No AI / Gemini calls. No estimated or dummy data.
+- API keys read from env vars only; never logged or returned to client.
 - Two-level cache:
     L1 – in-process dict  (fast, no I/O)
     L2 – MongoDB          (survives restarts)
   Train search: 24 h TTL.  Fare: 48 h TTL.
-- In-flight deduplication: identical concurrent requests share one API call.
-- Fares fetched only on demand (one class, one call) — never upfront.
-- On 429 / credits exhausted: 1-hour backoff, serve stale cache if present.
+- In-flight deduplication: identical concurrent requests share one fetch.
+- On 429 / bridge down: serve stale cache if present.
 """
 
 from __future__ import annotations
@@ -20,7 +22,10 @@ import os
 import time
 import logging
 import asyncio
+import subprocess
+import sys
 from datetime import datetime, timezone, timedelta
+from pathlib import Path
 from typing import Optional
 
 import httpx
@@ -29,26 +34,26 @@ logger = logging.getLogger("transport")
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 
-# Parse IRCTC (new primary source)
-PARSE_KEY      = os.environ.get("PARSE_API_KEY", "")
-PARSE_BASE     = os.environ.get("PARSE_IRCTC_BASE_URL", "").rstrip("/")
+# Railkit bridge (Node.js micro-service, local only)
+RAILKIT_BRIDGE_PORT   = int(os.environ.get("RAILKIT_BRIDGE_PORT", "7421"))
+RAILKIT_BRIDGE_BASE   = f"http://127.0.0.1:{RAILKIT_BRIDGE_PORT}"
+RAILKIT_API_KEY       = os.environ.get("RAILKIT_API_KEY", "")
 
-# SerpAPI flights (unchanged)
-SERPAPI_KEY    = os.environ.get("SERPAPI_KEY", "")
-SERPAPI_BASE   = "https://serpapi.com/search.json"
+# SerpAPI flights
+SERPAPI_KEY  = os.environ.get("SERPAPI_KEY", "")
+SERPAPI_BASE = "https://serpapi.com/search.json"
 
-REQUEST_TIMEOUT = 45          # seconds — Parse IRCTC scrapes in real time, needs headroom
+BRIDGE_TIMEOUT  = 20          # seconds for bridge calls (local, fast)
+FLIGHT_TIMEOUT  = 20          # seconds for SerpAPI
 
-# Cache TTLs (seconds)
-TRAIN_TTL  = 24 * 3600        # 24 hours
-FARE_TTL   = 48 * 3600        # 48 hours
-FLIGHT_TTL = 5  * 60          # 5 minutes (prices change fast)
+# Cache TTLs
+TRAIN_TTL  = 24 * 3600        # 24 h
+FARE_TTL   = 48 * 3600        # 48 h
+FLIGHT_TTL = 5  * 60          # 5 min
 
-# Backoff duration after 429 / credits exhausted
-BACKOFF_TTL = 3600            # 1 hour
+BACKOFF_TTL = 3600            # 1 h after repeated bridge failures
 
-# ── MongoDB handle (injected at startup) ───────────────────────────────────────
-# server.py calls  transport_service.init_db(db)  after Motor connects.
+# ── MongoDB handle ─────────────────────────────────────────────────────────────
 _db = None
 
 def init_db(motor_db) -> None:
@@ -56,14 +61,12 @@ def init_db(motor_db) -> None:
     _db = motor_db
 
 async def _cache_collection():
-    """Return the transport_cache collection, creating TTL index once."""
     col = _db["transport_cache"]
-    # MongoDB TTL index deletes documents after expires_at
     await col.create_index("expires_at", expireAfterSeconds=0, background=True)
     return col
 
-# ── In-process (L1) cache ──────────────────────────────────────────────────────
-_l1: dict[str, tuple[float, object]] = {}          # key → (stored_at, value)
+# ── L1 in-process cache ────────────────────────────────────────────────────────
+_l1: dict[str, tuple[float, object]] = {}
 
 def _l1_get(key: str, ttl: int) -> Optional[object]:
     entry = _l1.get(key)
@@ -74,29 +77,13 @@ def _l1_get(key: str, ttl: int) -> Optional[object]:
 def _l1_set(key: str, value: object) -> None:
     _l1[key] = (time.time(), value)
 
-# ── In-process backoff state ───────────────────────────────────────────────────
-_backoff_until: float = 0.0          # epoch seconds
-
-def _is_backed_off() -> bool:
-    return time.time() < _backoff_until
-
-def _set_backoff() -> None:
-    global _backoff_until
-    _backoff_until = time.time() + BACKOFF_TTL
-    logger.warning("Parse IRCTC API: 1-hour backoff started (quota/rate-limit hit).")
-
-# ── In-flight deduplication ────────────────────────────────────────────────────
-# Maps cache-key → asyncio.Future whose result is the API response.
-_in_flight: dict[str, asyncio.Future] = {}
-
-# ── MongoDB L2 cache helpers ───────────────────────────────────────────────────
-
+# ── L2 MongoDB cache ───────────────────────────────────────────────────────────
 async def _l2_get(key: str) -> Optional[object]:
     if _db is None:
         return None
     try:
-        col  = await _cache_collection()
-        doc  = await col.find_one({"_id": key}, {"_id": 0, "value": 1})
+        col = await _cache_collection()
+        doc = await col.find_one({"_id": key}, {"_id": 0, "value": 1})
         return doc["value"] if doc else None
     except Exception as exc:
         logger.debug("L2 cache read failed (%s)", type(exc).__name__)
@@ -106,7 +93,7 @@ async def _l2_set(key: str, value: object, ttl: int) -> None:
     if _db is None:
         return
     try:
-        col = await _cache_collection()
+        col     = await _cache_collection()
         expires = datetime.now(timezone.utc) + timedelta(seconds=ttl)
         await col.replace_one(
             {"_id": key},
@@ -117,13 +104,12 @@ async def _l2_set(key: str, value: object, ttl: int) -> None:
         logger.debug("L2 cache write failed (%s)", type(exc).__name__)
 
 async def _cache_get(key: str, ttl: int) -> Optional[object]:
-    """Check L1 first, then L2."""
     v = _l1_get(key, ttl)
     if v is not None:
         return v
     v = await _l2_get(key)
     if v is not None:
-        _l1_set(key, v)          # warm L1
+        _l1_set(key, v)
         return v
     return None
 
@@ -131,26 +117,79 @@ async def _cache_set(key: str, value: object, ttl: int) -> None:
     _l1_set(key, value)
     await _l2_set(key, value, ttl)
 
-# ── Parse IRCTC API helper ─────────────────────────────────────────────────────
+# ── In-flight dedup ────────────────────────────────────────────────────────────
+_in_flight: dict[str, asyncio.Future] = {}
 
-def _parse_headers() -> dict:
-    return {
-        "X-API-Key":     PARSE_KEY,
-        "Content-Type":  "application/json",
-    }
+# ── Backoff ────────────────────────────────────────────────────────────────────
+_backoff_until: float = 0.0
 
-async def _parse_post(endpoint: str, body: dict) -> dict:
-    """POST to Parse IRCTC. Raises RuntimeError on credits issues; returns body otherwise."""
-    url = f"{PARSE_BASE}/{endpoint}"
-    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-        resp = await client.post(url, json=body, headers=_parse_headers())
+def _is_backed_off() -> bool:
+    return time.time() < _backoff_until
 
-    if resp.status_code in (429, 402):
-        _set_backoff()
-        raise RuntimeError("CREDITS_EXHAUSTED")
+def _set_backoff() -> None:
+    global _backoff_until
+    _backoff_until = time.time() + BACKOFF_TTL
+    logger.warning("Railkit bridge backoff started (1 h).")
 
-    # Return the raw JSON regardless of status — callers inspect status_code
-    return {"_http_status": resp.status_code, **resp.json()}
+# ── Railkit bridge process management ─────────────────────────────────────────
+_bridge_proc: Optional[subprocess.Popen] = None
+
+def start_bridge() -> None:
+    """
+    Spawn the Railkit Node.js bridge as a subprocess.
+    Called once from server.py at startup.
+    """
+    global _bridge_proc
+
+    bridge_dir = Path(__file__).parent.parent / "railkit-bridge"
+    server_mjs = bridge_dir / "server.mjs"
+
+    if not server_mjs.exists():
+        logger.error("railkit-bridge/server.mjs not found at %s — train search disabled", server_mjs)
+        return
+
+    if not RAILKIT_API_KEY:
+        logger.error("RAILKIT_API_KEY not set — train search disabled")
+        return
+
+    env = {**os.environ, "RAILKIT_API_KEY": RAILKIT_API_KEY, "RAILKIT_BRIDGE_PORT": str(RAILKIT_BRIDGE_PORT)}
+
+    try:
+        _bridge_proc = subprocess.Popen(
+            ["node", str(server_mjs)],
+            cwd=str(bridge_dir),
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        logger.info("Railkit bridge started (PID %s) on port %s", _bridge_proc.pid, RAILKIT_BRIDGE_PORT)
+    except FileNotFoundError:
+        logger.error("node not found in PATH — Railkit bridge disabled. Install Node.js >= 18.")
+    except Exception as exc:
+        logger.error("Failed to start Railkit bridge: %s", exc)
+
+
+def stop_bridge() -> None:
+    """Terminate the bridge process on shutdown."""
+    if _bridge_proc and _bridge_proc.poll() is None:
+        _bridge_proc.terminate()
+        logger.info("Railkit bridge terminated.")
+
+
+async def _wait_for_bridge(timeout: float = 8.0) -> bool:
+    """Poll /health until the bridge is ready or timeout expires."""
+    deadline = time.time() + timeout
+    async with httpx.AsyncClient(timeout=2.0) as client:
+        while time.time() < deadline:
+            try:
+                r = await client.get(f"{RAILKIT_BRIDGE_BASE}/health")
+                if r.status_code == 200:
+                    return True
+            except Exception:
+                pass
+            await asyncio.sleep(0.4)
+    return False
+
 
 # ── City lookup tables ─────────────────────────────────────────────────────────
 
@@ -320,27 +359,14 @@ CITY_TO_IATA: dict[str, str] = {
 }
 
 def _normalize_city(city: str) -> str:
-    """
-    Normalize a city string for lookup.
-    Handles formats like:
-      "Surat"
-      "Surat, Gujarat"
-      "Surat, Gujarat, India"
-      "Surat (STV)"
-    Extracts just the primary city name.
-    """
     if not city:
         return ""
-    # Take only the part before the first comma
     primary = city.split(",")[0].strip()
-    # Remove parenthetical suffixes like "(STV)"
     primary = primary.split("(")[0].strip()
     return primary.lower()
 
-
 def city_to_station(city: str) -> Optional[str]:
     return CITY_TO_STATION.get(_normalize_city(city))
-
 
 def city_to_iata(city: str) -> Optional[str]:
     return CITY_TO_IATA.get(_normalize_city(city))
@@ -349,275 +375,253 @@ def city_to_iata(city: str) -> Optional[str]:
 
 _WEEKDAY_KEYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 
-def _runs_on_date(running_days: dict, date_iso: str) -> bool:
+def _running_days_str_to_dict(running_days: str) -> dict:
     """
-    Returns True if the train runs on the weekday of date_iso (YYYY-MM-DD).
-    running_days = {"mon": true/false, "tue": true/false, ...}
+    Convert Railkit running_days string '1111110' (Mon-Sun bitmask) to dict.
+    '1111111' = runs every day.  Position 0 = Monday.
     """
+    keys   = _WEEKDAY_KEYS
+    result = {}
+    for i, key in enumerate(keys):
+        result[key] = (i < len(running_days) and running_days[i] == "1")
+    return result
+
+def _runs_on_date(running_days_str: str, date_iso: str) -> bool:
+    """Returns True if train runs on the weekday of date_iso."""
     try:
         dt  = datetime.strptime(date_iso, "%Y-%m-%d")
-        key = _WEEKDAY_KEYS[dt.weekday()]   # Monday=0
-        return bool(running_days.get(key, True))
+        idx = dt.weekday()   # 0=Monday
+        return idx < len(running_days_str) and running_days_str[idx] == "1"
     except Exception:
-        return True     # if we can't parse, don't hide the train
+        return True
 
-# ── Train search ───────────────────────────────────────────────────────────────
+# ── Railkit class list — used as default when Railkit doesn't supply them ──────
 
-async def _fetch_trains_parse(
-    from_code: str,
-    to_code: str,
-    date_iso: str,      # YYYY-MM-DD
-) -> list:
-    """
-    POST /search_trains via Parse IRCTC.
-    Handles deduplication: two simultaneous identical requests share one call.
-    Never called if backoff is active; caller raises with stale cache result.
-    """
-    cache_key = f"trains:{from_code}:{to_code}:{date_iso}"
+# Railkit searchTrainBetweenStations doesn't return class lists per-train.
+# We map train type to likely classes as a sensible default.
+# Fares are fetched on demand so this is just for display.
+_TYPE_CLASSES: dict[str, list[str]] = {
+    "RAJDHANI":  ["1A", "2A", "3A"],
+    "SHATABDI":  ["CC", "EC"],
+    "DURONTO":   ["SL", "3A", "2A", "1A"],
+    "GARIB":     ["SL", "3A"],
+    "SUPERFAST": ["SL", "3A", "2A"],
+    "EXPRESS":   ["SL", "3A", "2A"],
+    "MAIL":      ["SL", "3A", "2A"],
+    "PASSENGER": ["2S", "SL"],
+    "LOCAL":     ["2S"],
+    "INTERCITY": ["CC", "2S"],
+    "VANDE":     ["CC", "EC"],
+}
 
-    # L1 + L2 cache check
-    cached = await _cache_get(cache_key, TRAIN_TTL)
-    if cached is not None:
-        logger.info("cache hit  trains %s→%s %s", from_code, to_code, date_iso)
-        return cached
-
-    # In-flight dedup: if another coroutine is already fetching this key, wait for it
-    if cache_key in _in_flight:
-        logger.info("in-flight dedup trains %s→%s %s", from_code, to_code, date_iso)
-        return await asyncio.shield(_in_flight[cache_key])
-
-    loop   = asyncio.get_event_loop()
-    future: asyncio.Future = loop.create_future()
-    _in_flight[cache_key] = future
-
-    try:
-        logger.info("API call   trains %s→%s %s  (Parse IRCTC)", from_code, to_code, date_iso)
-        body = {
-            "date":                date_iso,
-            "source_station":      from_code,
-            "destination_station": to_code,
-        }
-        data = await _parse_post("search_trains", body)
-
-        http_status = data.pop("_http_status", 200)
-        if http_status != 200:
-            raise RuntimeError(f"search_trains HTTP {http_status}")
-
-        # Response: {"data": {"trains": [...], "total_trains": N}}
-        inner  = data.get("data") or data
-        trains = (inner.get("trains") if isinstance(inner, dict) else None) or []
-
-        await _cache_set(cache_key, trains, TRAIN_TTL)
-        future.set_result(trains)
-        return trains
-
-    except RuntimeError:
-        future.set_exception(RuntimeError("CREDITS_EXHAUSTED"))
-        raise
-
-    except Exception as exc:
-        future.set_exception(exc)
-        raise
-
-    finally:
-        _in_flight.pop(cache_key, None)
+def _default_classes(train_type: str) -> list[str]:
+    t = (train_type or "").upper()
+    for key, classes in _TYPE_CLASSES.items():
+        if key in t:
+            return classes
+    return ["SL", "3A", "2A"]   # safe default
 
 
-async def get_trains(
-    origin_city: str,
-    dest_city: str,
-    date_iso: str,
-) -> dict:
+# ── Train search via Railkit bridge ───────────────────────────────────────────
+
+async def _bridge_get(path: str, params: dict) -> dict:
+    """GET from the local Railkit bridge."""
+    url = f"{RAILKIT_BRIDGE_BASE}{path}"
+    async with httpx.AsyncClient(timeout=BRIDGE_TIMEOUT) as client:
+        resp = await client.get(url, params=params)
+    return resp.json()
+
+
+async def get_trains(origin_city: str, dest_city: str, date_iso: str) -> dict:
     """
     Returns {"trains": [...], "error": None, "stale": False}
-    Train shape (no fares — fetched on demand):
+
+    Train shape:
       name, number, from_station, to_station,
       departure_time, arrival_time, duration, distance,
-      runs_on {mon..sun},
-      classes: [{name}]   ← price/price_int added later by get_fare()
+      runs_on {mon..sun},  train_type,
+      classes: [{name, price: None}]   <- price filled by get_fare() on demand
     """
     from_code = city_to_station(origin_city)
     to_code   = city_to_station(dest_city)
 
     if not from_code:
-        return {"trains": [], "error": f"No station code found for '{origin_city}'.", "stale": False}
+        return {"trains": [], "error": f"No station code for '{origin_city}'.", "stale": False}
     if not to_code:
-        return {"trains": [], "error": f"No station code found for '{dest_city}'.", "stale": False}
+        return {"trains": [], "error": f"No station code for '{dest_city}'.", "stale": False}
 
-    stale = False
+    cache_key = f"rk:trains:{from_code}:{to_code}"   # Railkit search is not date-specific
+    cached    = await _cache_get(cache_key, TRAIN_TTL)
+    if cached is not None:
+        logger.info("cache hit  trains %s->%s", from_code, to_code)
+        return {"trains": _filter_by_date(cached, date_iso)[:6], "error": None, "stale": False}
 
     if _is_backed_off():
-        # Serve stale cache if available
-        cache_key = f"trains:{from_code}:{to_code}:{date_iso}"
-        cached = await _l2_get(cache_key)     # ignore TTL — serve anything
-        if cached:
-            stale = True
-            raw_trains = cached
-            logger.info("serving stale cache during backoff  trains %s→%s", from_code, to_code)
-        else:
-            return {
-                "trains": [],
-                "error":  "Train data is temporarily unavailable. Check trains on IRCTC.",
-                "irctc_link": "https://www.irctc.co.in",
-                "stale":  False,
-            }
-    else:
-        try:
-            raw_trains = await _fetch_trains_parse(from_code, to_code, date_iso)
-        except RuntimeError as e:
-            # Credits exhausted — try stale
-            cache_key = f"trains:{from_code}:{to_code}:{date_iso}"
-            cached    = await _l2_get(cache_key)
-            if cached:
-                stale      = True
-                raw_trains = cached
-                logger.info("serving stale cache after credits error  trains %s→%s", from_code, to_code)
-            else:
-                return {
-                    "trains": [],
-                    "error":  "Train data is temporarily unavailable. Check trains on IRCTC.",
-                    "irctc_link": "https://www.irctc.co.in",
-                    "stale":  False,
-                }
-        except Exception as exc:
-            logger.error("Train fetch error (%s) — masked", type(exc).__name__)
-            return {"trains": [], "error": "Unable to load trains. Please try again.", "stale": False}
+        stale = await _l2_get(cache_key)
+        if stale:
+            return {"trains": _filter_by_date(stale, date_iso)[:6], "error": None, "stale": True}
+        return {"trains": [], "error": "Train search temporarily unavailable. Check IRCTC.", "stale": False}
 
-    if not raw_trains:
-        return {"trains": [], "error": None, "stale": False}
+    # In-flight dedup
+    if cache_key in _in_flight:
+        logger.info("in-flight dedup trains %s->%s", from_code, to_code)
+        raw = await asyncio.shield(_in_flight[cache_key])
+        return {"trains": _filter_by_date(raw, date_iso)[:6], "error": None, "stale": False}
 
-    # Normalise and filter by running day
-    result_trains = []
-    for t in raw_trains:
-        running_days = t.get("running_days") or {}
-        if not _runs_on_date(running_days, date_iso):
-            continue
+    loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
+    future: asyncio.Future = loop.create_future()
+    _in_flight[cache_key] = future
 
-        # Parse IRCTC field names
-        number       = str(t.get("train_number") or "")
-        name         = t.get("train_name") or number
-        dep          = t.get("departure_time") or ""
-        arr          = t.get("arrival_time") or ""
-        dur          = t.get("duration") or ""
-        from_stn     = t.get("from_station") or from_code
-        to_stn       = t.get("to_station") or to_code
-        distance     = t.get("distance") or ""
-        avl_cls_raw  = t.get("available_classes") or []
+    try:
+        logger.info("API call   trains %s->%s  (Railkit)", from_code, to_code)
+        data = await _bridge_get("/trains", {"from": from_code, "to": to_code})
 
-        # Normalise class list to strings
-        if avl_cls_raw and isinstance(avl_cls_raw[0], dict):
-            avl_cls = [c.get("class_code") or c.get("name") or "" for c in avl_cls_raw]
-        else:
-            avl_cls = [str(c) for c in avl_cls_raw]
-        avl_cls = [c for c in avl_cls if c]
+        if not data.get("success"):
+            err = data.get("error", "Unknown error from Railkit bridge")
+            logger.warning("Railkit trains failed: %s", err)
+            future.set_result([])
+            return {"trains": [], "error": "Train search unavailable. Check IRCTC.", "stale": False}
 
-        # Classes start with no price; fare fetched on chip click
-        classes = [{"name": c, "price": None, "price_int": None} for c in avl_cls]
+        raw_trains = data.get("data") or []
 
-        result_trains.append({
-            "name":           name,
-            "number":         number,
-            "from_station":   from_stn,
-            "to_station":     to_stn,
-            "departure_time": dep,
-            "arrival_time":   arr,
-            "duration":       dur,
-            "distance":       distance,
-            "runs_on":        running_days,
-            "classes":        classes,
-            "fare_quota_exceeded": False,
-        })
+        # Normalise to our internal shape
+        normalised = []
+        for t in raw_trains:
+            rd_str   = t.get("running_days", "1111111")
+            rd_dict  = _running_days_str_to_dict(rd_str)
+            ttype    = t.get("type") or ""
+            classes  = [{"name": c, "price": None, "price_int": None}
+                        for c in _default_classes(ttype)]
 
-    return {"trains": result_trains[:5], "error": None, "stale": stale}
+            normalised.append({
+                "name":           t.get("train_name", ""),
+                "number":         str(t.get("train_no", "")),
+                "from_station":   t.get("from_stn_code", from_code),
+                "to_station":     t.get("to_stn_code", to_code),
+                "departure_time": t.get("from_time", ""),
+                "arrival_time":   t.get("to_time", ""),
+                "duration":       t.get("travel_time", ""),
+                "distance":       str(t.get("distance", "")),
+                "runs_on":        rd_dict,
+                "running_days":   rd_str,
+                "train_type":     ttype,
+                "halts":          t.get("halts", 0),
+                "classes":        classes,
+            })
+
+        await _cache_set(cache_key, normalised, TRAIN_TTL)
+        future.set_result(normalised)
+        return {"trains": _filter_by_date(normalised, date_iso)[:6], "error": None, "stale": False}
+
+    except Exception as exc:
+        logger.error("Railkit bridge error (%s): %s", type(exc).__name__, exc)
+        future.set_exception(exc)
+        # Try stale
+        stale = await _l2_get(cache_key)
+        if stale:
+            return {"trains": _filter_by_date(stale, date_iso)[:6], "error": None, "stale": True}
+        return {"trains": [], "error": "Unable to load trains. Please try again.", "stale": False}
+
+    finally:
+        _in_flight.pop(cache_key, None)
 
 
-# ── Fare (on-demand, one class at a time) ──────────────────────────────────────
+def _filter_by_date(trains: list, date_iso: str) -> list:
+    """Keep only trains that run on the weekday of date_iso."""
+    return [
+        t for t in trains
+        if _runs_on_date(t.get("running_days", "1111111"), date_iso)
+    ]
+
+
+# ── Fare (on-demand) ───────────────────────────────────────────────────────────
 
 async def get_fare(
     train_number: str,
     from_station: str,
     to_station: str,
     travel_class: str,
+    travel_date: str = "",    # DD-MM-YYYY preferred; YYYY-MM-DD accepted
 ) -> dict:
     """
-    Returns {"fare": 650, "price": "₹650", "error": None}
-         or {"fare": None, "price": None,  "error": "..."}
-    Called only when the user clicks a class chip.
+    Returns {"fare": 1670, "price": "₹1,670", "error": None, "breakdown": {...}}
+          or {"fare": None, "price": None,     "error": "...", "unavailable": False}
     """
-    cache_key = f"fare:{train_number}:{from_station}:{to_station}:{travel_class}"
+    # Normalise date to DD-MM-YYYY (Railkit format)
+    dd_mm_yyyy = _to_ddmmyyyy(travel_date)
+    if not dd_mm_yyyy:
+        # Use today+7 as a sensible fallback for fare lookup
+        from datetime import date, timedelta
+        fallback = date.today() + timedelta(days=7)
+        dd_mm_yyyy = fallback.strftime("%d-%m-%Y")
 
+    cache_key = f"rk:fare:{train_number}:{from_station}:{to_station}:{travel_class}:{dd_mm_yyyy}"
     cached = await _cache_get(cache_key, FARE_TTL)
     if cached is not None:
         logger.info("cache hit  fare %s %s", train_number, travel_class)
         return cached
 
     if _is_backed_off():
-        return {"fare": None, "price": None, "error": "Fare lookup temporarily unavailable."}
+        return {"fare": None, "price": None, "error": "Fare lookup temporarily unavailable.", "unavailable": False}
 
-    # In-flight dedup
     if cache_key in _in_flight:
         logger.info("in-flight dedup fare %s %s", train_number, travel_class)
         return await asyncio.shield(_in_flight[cache_key])
 
-    loop   = asyncio.get_event_loop()
+    loop: asyncio.AbstractEventLoop = asyncio.get_event_loop()
     future: asyncio.Future = loop.create_future()
     _in_flight[cache_key] = future
 
     try:
-        logger.info("API call   fare %s %s %s→%s  (Parse IRCTC)", train_number, travel_class, from_station, to_station)
-        body = {
-            "train_number":        train_number,
-            "source_station":      from_station,
-            "destination_station": to_station,
-            "travel_class":        travel_class,
-        }
-        data        = await _parse_post("get_fare", body)
-        http_status = data.pop("_http_status", 200)
+        logger.info("API call   fare %s %s %s->%s %s  (Railkit)",
+                    train_number, travel_class, from_station, to_station, dd_mm_yyyy)
 
-        if http_status == 422:
-            # Class not available on this route — not a system error, don't retry
-            err_msg = (data.get("error") or {}).get("message", "Class not available on this route.")
-            logger.info("Fare 422 for %s %s: %s", train_number, travel_class, err_msg)
-            result = {"fare": None, "price": None, "error": None, "unavailable": True}
-            # Cache for a short time so repeated clicks don't re-hit the API
+        data = await _bridge_get("/fare", {
+            "train": train_number,
+            "from":  from_station,
+            "to":    to_station,
+            "date":  dd_mm_yyyy,
+            "class": travel_class,
+            "quota": "GN",
+        })
+
+        if not data.get("success"):
+            err = data.get("error", "Fare not available")
+            logger.info("Railkit fare failed for %s %s: %s", train_number, travel_class, err)
+            # Treat "No valid Station" / "not found" as unavailable (not a system error)
+            unavail = any(kw in err.lower() for kw in ["station", "not found", "invalid"])
+            result = {"fare": None, "price": None, "error": None if unavail else err,
+                      "unavailable": unavail}
             await _cache_set(cache_key, result, 3600)
             future.set_result(result)
             return result
 
-        if http_status != 200:
-            raise RuntimeError(f"get_fare HTTP {http_status}")
-
-        # Response: {"fare": {"total_fare": 650, ...}}
-        fare_obj = (
-            data.get("fare")
-            or (data.get("data") or {}).get("fare")
-            or {}
-        )
-        total = (
-            fare_obj.get("total_fare")
-            or fare_obj.get("totalFare")
-            or fare_obj.get("fare")
-        )
+        d = data.get("data") or {}
+        total = d.get("totalFare")
         fare_int = int(total) if total is not None else None
 
         result = {
             "fare":        fare_int,
-            "price":       f"₹{fare_int:,}" if fare_int else None,
+            "price":       f"\u20b9{fare_int:,}" if fare_int else None,
             "error":       None,
             "unavailable": False,
+            "breakdown": {
+                "base":        d.get("baseFare"),
+                "reservation": d.get("reservation"),
+                "superfast":   d.get("superfast"),
+                "catering":    d.get("catering"),
+                "gst":         d.get("gst"),
+                "dynamic":     d.get("dynamicFare"),
+                "tatkal":      d.get("tatkalFare"),
+            },
         }
         await _cache_set(cache_key, result, FARE_TTL)
         future.set_result(result)
         return result
 
-    except RuntimeError as e:
-        err_result = {"fare": None, "price": None, "error": "Fare lookup temporarily unavailable."}
-        future.set_result(err_result)
-        return err_result
-
     except Exception as exc:
-        logger.error("Fare fetch error (%s) — masked", type(exc).__name__)
-        err_result = {"fare": None, "price": None, "error": "Unable to fetch fare."}
+        logger.error("Railkit fare error (%s): %s", type(exc).__name__, exc)
+        err_result = {"fare": None, "price": None, "error": "Unable to fetch fare.", "unavailable": False}
         future.set_result(err_result)
         return err_result
 
@@ -625,30 +629,39 @@ async def get_fare(
         _in_flight.pop(cache_key, None)
 
 
-# ── Flight helpers (unchanged) ─────────────────────────────────────────────────
+def _to_ddmmyyyy(date_str: str) -> str:
+    """Convert YYYY-MM-DD or DD-MM-YYYY to DD-MM-YYYY. Returns '' if unparseable."""
+    if not date_str:
+        return ""
+    if len(date_str) == 10 and date_str[4] == "-":
+        # YYYY-MM-DD
+        parts = date_str.split("-")
+        return f"{parts[2]}-{parts[1]}-{parts[0]}"
+    if len(date_str) == 10 and date_str[2] == "-":
+        return date_str   # already DD-MM-YYYY
+    return ""
+
+
+# ── Flights (SerpAPI — unchanged) ─────────────────────────────────────────────
 
 def _fmt_duration(minutes: int) -> str:
     h, m = divmod(minutes, 60)
     return f"{h}h {m:02d}m"
 
 
-async def get_flights(
-    origin_city: str,
-    dest_city: str,
-    date_iso: str,
-) -> dict:
+async def get_flights(origin_city: str, dest_city: str, date_iso: str) -> dict:
     dep_iata = city_to_iata(origin_city)
     arr_iata = city_to_iata(dest_city)
 
     if not dep_iata:
-        return {"flights": [], "error": f"No airport code found for '{origin_city}'."}
+        return {"flights": [], "error": f"No airport code for '{origin_city}'."}
     if not arr_iata:
-        return {"flights": [], "error": f"No airport code found for '{dest_city}'."}
+        return {"flights": [], "error": f"No airport code for '{dest_city}'."}
 
     cache_key = f"flights:{dep_iata}:{arr_iata}:{date_iso}"
     cached    = await _cache_get(cache_key, FLIGHT_TTL)
     if cached is not None:
-        logger.info("cache hit  flights %s→%s %s", dep_iata, arr_iata, date_iso)
+        logger.info("cache hit  flights %s->%s %s", dep_iata, arr_iata, date_iso)
         return cached
 
     params = {
@@ -663,11 +676,11 @@ async def get_flights(
     }
 
     try:
-        logger.info("API call   flights %s→%s %s  (SerpAPI)", dep_iata, arr_iata, date_iso)
-        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
+        logger.info("API call   flights %s->%s %s  (SerpAPI)", dep_iata, arr_iata, date_iso)
+        async with httpx.AsyncClient(timeout=FLIGHT_TIMEOUT) as client:
             resp = await client.get(SERPAPI_BASE, params=params)
-    except Exception as e:
-        logger.error("Flight fetch error (%s)", type(e).__name__)
+    except Exception as exc:
+        logger.error("Flight fetch error (%s)", type(exc).__name__)
         return {"flights": [], "error": "Unable to load flights. Please try again."}
 
     if resp.status_code == 429:
@@ -684,7 +697,7 @@ async def get_flights(
         return result
 
     flights = []
-    for group in raw_groups[:8]:
+    for group in raw_groups[:6]:
         legs = group.get("flights", [])
         if not legs:
             continue
@@ -723,7 +736,7 @@ async def get_flights(
             "arrival_time":   arr_time,
             "duration":       _fmt_duration(total_min) if total_min else "",
             "stops":          stops_str,
-            "price":          f"₹{price_int:,}" if price_int else None,
+            "price":          f"\u20b9{price_int:,}" if price_int else None,
             "price_int":      price_int,
         })
 

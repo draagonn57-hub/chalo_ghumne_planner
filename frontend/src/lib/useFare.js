@@ -10,16 +10,17 @@ import { useState, useCallback, useRef } from "react";
 import { api } from "@/lib/api";
 
 /**
- * useTrainFares(trains)
+ * useTrainFares(trains, travelDate)
  *
  * Returns:
- *   fares:      { "<trainIdx>:<classIdx>": { price, price_int, error, loading, unavailable } }
+ *   fares:      { "<trainIdx>:<classIdx>": { price, price_int, error, loading, unavailable, breakdown } }
  *   fetchFare:  (trainIdx, classIdx, train) => void
  *
  * trains must be the array from useTransport — each item has
  *   { number, from_station, to_station, classes: [{name}] }
+ * travelDate is YYYY-MM-DD passed to the fare API for accurate pricing.
  */
-export function useTrainFares(trains) {
+export function useTrainFares(trains, travelDate = "") {
   const [fares, setFares] = useState({});
 
   // Stable ref so fetchFare never re-creates due to fares state change
@@ -53,6 +54,7 @@ export function useTrainFares(trains) {
           from_station: train.from_station,
           to_station:   train.to_station,
           travel_class: cls.name,
+          travel_date:  travelDate || undefined,
         });
 
         setFares((prev) => ({
@@ -63,6 +65,7 @@ export function useTrainFares(trains) {
             price_int:   data.fare        ?? null,
             error:       data.error       ?? null,
             unavailable: data.unavailable ?? false,
+            breakdown:   data.breakdown   ?? null,
           },
         }));
       } catch (err) {

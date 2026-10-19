@@ -464,7 +464,7 @@ function ItineraryView({
   } = useTransport(localIt, preferences, isDomestic);
 
   // On-demand fare fetching — called when user clicks a class chip
-  const { fares: trainFares, fetchFare } = useTrainFares(realTrains);
+  const { fares: trainFares, fetchFare } = useTrainFares(realTrains, travelDate);
 
   // Build displayIt: inject real flights/trains so the rest of the render
   // tree (CostBreakdown, cards) works unchanged.
