@@ -522,15 +522,20 @@ function TransportStep({
                         </div>
                       </div>
                       <div className="shrink-0 text-right">
-                        {activeFare?.loading && <div className="text-xs text-slate-400 animate-pulse">Loading…</div>}
-                        {activeFare?.price && !activeFare.loading && (
+                        {activeFare?.loading && (
+                          <div className="text-xs text-slate-400 animate-pulse">Loading…</div>
+                        )}
+                        {activeFare?.price && !activeFare?.loading && (
                           <>
                             <div className="text-[#0D5C75] font-bold text-lg">{activeFare.price}</div>
                             <div className="text-xs text-slate-400">{tr.classes?.[activeClassIdx]?.name} class</div>
                           </>
                         )}
-                        {!activeFare?.price && !activeFare?.loading && (
-                          <div className="text-xs text-slate-400">Pick a class</div>
+                        {activeFare?.unavailable && !activeFare?.loading && (
+                          <div className="text-xs text-slate-400">Not available</div>
+                        )}
+                        {!activeFare && (
+                          <div className="text-xs text-slate-400 italic">Pick a class ↓</div>
                         )}
                       </div>
                     </div>
@@ -546,7 +551,9 @@ function TransportStep({
                             ? `${cls.name} · …`
                             : fareData?.price
                               ? `${cls.name} · ${fareData.price}`
-                              : cls.name;
+                              : fareData?.unavailable
+                                ? `${cls.name} ✗`
+                                : cls.name;
                           return (
                             <button
                               key={classIdx}
@@ -585,6 +592,16 @@ function TransportStep({
                         ))}
                       </div>
                     )}
+
+                    {/* IRCTC link */}
+                    <a
+                      href="https://www.irctc.co.in/nget/train-search"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-[#0D5C75] transition-colors"
+                    >
+                      View price on IRCTC ↗
+                    </a>
                   </div>
                 );
               })}

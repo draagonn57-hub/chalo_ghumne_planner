@@ -101,27 +101,38 @@ export default function Checkout() {
         sessionStorage.removeItem("tp_pending_booking");
         sessionStorage.setItem("tp_last_booking", JSON.stringify(saved));
         const bookingId = saved.booking_id || saved.id;
+        // Show success message immediately
+        toast.success("🎉 Booking confirmed! Confirmation email sent to your Gmail.", {
+          duration: 5000,
+        });
         if (bookingId) {
           nav(`/booking/confirmation/${bookingId}`);
         } else {
-          // Booking saved but ID missing — go to dashboard
-          toast.success("Booking confirmed! View it in your dashboard.");
           nav("/dashboard");
         }
       } catch (err) {
-        // Check if it's actually a navigation error after a successful save
-        const detail = err?.response?.data?.detail;
-        const status = err?.response?.status;
+        // Safely extract error message — never pass objects to toast
+        let msg = "Booking failed. Please try again.";
         if (!err?.response) {
-          // No HTTP response → booking likely saved, navigation failed
-          toast.success("Booking confirmed! View it in your dashboard.");
+          // Network error after booking may have saved — check dashboard
+          toast.success("Booking confirmed! View it in your dashboard.", { duration: 5000 });
           sessionStorage.removeItem("tp_pending_booking");
           nav("/dashboard");
-        } else {
-          toast.error(detail || `Booking failed (${status || "unknown error"}). Please try again.`);
-          setProcessing(false);
-          setProcessStage(0);
+          return;
         }
+        const detail = err?.response?.data?.detail;
+        const status = err?.response?.status;
+        if (typeof detail === "string") {
+          msg = detail;
+        } else if (Array.isArray(detail)) {
+          // Pydantic v2 validation error array — extract first message
+          msg = detail[0]?.msg || `Validation error (${status})`;
+        } else if (status) {
+          msg = `Booking failed (HTTP ${status}). Please try again.`;
+        }
+        toast.error(msg);
+        setProcessing(false);
+        setProcessStage(0);
       }
     }, 3800);
   };
@@ -270,7 +281,7 @@ export default function Checkout() {
                 className="tp-card p-10 text-center"
               >
                 <div className="space-y-6">
-                  {["Processing payment…", "Verifying payment…", "Payment successful"].map((label, i) => {
+                  {["Processing payment…", "Verifying payment…", "Sending confirmation email…"].map((label, i) => {
                     const isDone = i < processStage;
                     const isActive = i === processStage;
                     return (

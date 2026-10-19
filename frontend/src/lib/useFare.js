@@ -13,18 +13,19 @@ import { api } from "@/lib/api";
  * useTrainFares(trains)
  *
  * Returns:
- *   fares:      { "<trainIdx>:<classIdx>": { price, price_int, error, loading } }
+ *   fares:      { "<trainIdx>:<classIdx>": { price, price_int, error, loading, unavailable } }
  *   fetchFare:  (trainIdx, classIdx, train) => void
  *
  * trains must be the array from useTransport — each item has
  *   { number, from_station, to_station, classes: [{name}] }
  */
 export function useTrainFares(trains) {
-  // fares["0:2"] = { price: "₹650", price_int: 650, error: null, loading: false }
   const [fares, setFares] = useState({});
 
-  // In-memory dedup: track in-flight requests so double-clicks don't double-fetch
-  const inFlight = useRef(new Set());
+  // Stable ref so fetchFare never re-creates due to fares state change
+  const faresRef    = useRef(fares);
+  const inFlight    = useRef(new Set());
+  faresRef.current  = fares;
 
   const fetchFare = useCallback(
     async (trainIdx, classIdx, train) => {
@@ -33,11 +34,18 @@ export function useTrainFares(trains) {
 
       const key = `${trainIdx}:${classIdx}`;
 
-      // Already loaded or loading
-      if (fares[key]?.price !== undefined || inFlight.current.has(key)) return;
+      // Already has a real price or unavailable — don't re-fetch
+      const existing = faresRef.current[key];
+      if (existing?.price || existing?.unavailable) return;
+
+      // Already in-flight
+      if (inFlight.current.has(key)) return;
 
       inFlight.current.add(key);
-      setFares((prev) => ({ ...prev, [key]: { loading: true, price: null, price_int: null, error: null } }));
+      setFares((prev) => ({
+        ...prev,
+        [key]: { loading: true, price: null, price_int: null, error: null, unavailable: false },
+      }));
 
       try {
         const { data } = await api.post("/fare", {
@@ -50,27 +58,29 @@ export function useTrainFares(trains) {
         setFares((prev) => ({
           ...prev,
           [key]: {
-            loading:   false,
-            price:     data.price     ?? null,
-            price_int: data.fare      ?? null,
-            error:     data.error     ?? null,
+            loading:     false,
+            price:       data.price       ?? null,
+            price_int:   data.fare        ?? null,
+            error:       data.error       ?? null,
+            unavailable: data.unavailable ?? false,
           },
         }));
       } catch (err) {
         setFares((prev) => ({
           ...prev,
           [key]: {
-            loading:   false,
-            price:     null,
-            price_int: null,
-            error:     err?.response?.data?.detail || "Unable to fetch fare.",
+            loading:     false,
+            price:       null,
+            price_int:   null,
+            error:       err?.response?.data?.detail || "Unable to fetch fare.",
+            unavailable: false,
           },
         }));
       } finally {
         inFlight.current.delete(key);
       }
     },
-    [fares]
+    [] // stable — reads fares via ref, not closure
   );
 
   return { fares, fetchFare };
