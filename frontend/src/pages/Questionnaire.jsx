@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Compass, Utensils, UtensilsCrossed, Sparkles, Users, Mountain, Music4, Landmark, Save as Waves, Leaf, ChefHat, ArrowLeft, ArrowRight, Check, Calendar, Globe, MapPin } from "lucide-react";
 import AILoadingChecklist from "@/components/AILoadingChecklist";
 import { getBudgetEstimates, BUDGET_OPTIONS } from "@/lib/budgetUtils";
+import CityAutocompleteInput from "@/components/CityAutocompleteInput";
 
 const SUGGESTION_STEPS = [
   "Understanding your preferences",
@@ -249,18 +250,16 @@ export default function Questionnaire() {
                       </button>
                     )}
                   </label>
-                  <label className="block mt-4">
-                    <span className="text-xs uppercase tracking-widest text-slate-500 font-semibold">
-                      Origin city (optional)
-                    </span>
-                    <input
+                  <div className="mt-4">
+                    <CityAutocompleteInput
+                      id="wizard-origin"
+                      label="Origin city (optional)"
                       value={state.origin}
-                      onChange={(e) => setState({ ...state, origin: e.target.value })}
+                      onChange={(val) => setState({ ...state, origin: val })}
                       placeholder="e.g. Mumbai"
-                      className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:border-[#E76F51] focus:outline-none transition-colors"
-                      data-testid="wizard-origin"
+                      testId="wizard-origin"
                     />
-                  </label>
+                  </div>
                 </div>
               ) : current.type === "combined" ? (
                 <div className="space-y-8">

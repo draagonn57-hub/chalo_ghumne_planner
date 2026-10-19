@@ -25,6 +25,7 @@ import CompareModal from "@/components/CompareModal";
 import VisitedPlacesInput from "@/components/VisitedPlacesInput";
 import { useAuth } from "@/lib/AuthContext";
 import { BUDGET_OPTIONS as SHARED_BUDGET_OPTIONS } from "@/lib/budgetUtils";
+import CityAutocompleteInput from "@/components/CityAutocompleteInput";
 
 const MAX_COMPARE = 4;
 const EMPTY_SUGGESTIONS = [];
@@ -215,14 +216,14 @@ function PreferencesRow({ prefs, onChange, disabled }) {
           <Navigation size={13} /> Travelling from
           <span className="text-slate-400 font-normal normal-case tracking-normal ml-1">(optional)</span>
         </label>
-        <input
-          type="text"
+        <CityAutocompleteInput
+          id="pref-origin"
+          label=""
           value={prefs.origin || ""}
-          disabled={disabled}
-          onChange={(e) => onChange({ ...prefs, origin: e.target.value })}
+          onChange={(val) => onChange({ ...prefs, origin: val })}
           placeholder="City name…"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:border-[#0D5C75] focus:ring-2 focus:ring-[#0D5C75]/10 disabled:opacity-50"
-          data-testid="pref-origin"
+          testId="pref-origin"
+          disabled={disabled}
         />
         <p className="text-xs text-slate-400 mt-1">Used to suggest flights and trains</p>
       </div>
