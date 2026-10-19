@@ -3,7 +3,6 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { jsPDF } from "jspdf";
 import { formatINR } from "@/lib/bookingUtils";
 import { SUPPORT_EMAIL, mailtoLink } from "@/lib/siteConfig";
 import { CircleCheck as CheckCircle2, Download, Hop as Home, Calendar, Plane, BedDouble, Users, MapPin, ArrowRight, Sparkles, Mail, Train } from "lucide-react";
@@ -14,6 +13,30 @@ export default function BookingConfirmation() {
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [emailStatus, setEmailStatus] = useState(null);
+  const [downloading, setDownloading] = useState(false);
+
+  const handleDownload = async () => {
+    if (downloading || !booking?.booking_id) return;
+    setDownloading(true);
+    try {
+      const res = await api.get(`/bookings/${booking.booking_id}/pdf/confirmation`, {
+        responseType: "blob",
+      });
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.setAttribute("download", `ChaloGhumne-Confirmation-${booking.booking_id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(`Could not generate PDF. Please contact ${SUPPORT_EMAIL}`);
+    } finally {
+      setDownloading(false);
+    }
+  };
 
   useEffect(() => {
     const raw = sessionStorage.getItem("tp_last_booking");
@@ -79,13 +102,6 @@ export default function BookingConfirmation() {
   const pricing = booking.pricing || {};
   const travelers = booking.travelers || {};
   const transportMode = (booking.transport_mode || "flight").toLowerCase();
-
-  // Mask email for display
-  const maskEmail = (email) => {
-    if (!email || !email.includes("@")) return "your email";
-    const [local, domain] = email.split("@");
-    return `${local[0]}***@${domain}`;
-  };
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-10 sm:py-14" data-testid="booking-confirmation">
@@ -240,8 +256,14 @@ export default function BookingConfirmation() {
         <Link to={`/bookings/${booking.booking_id}`} className="btn-secondary flex items-center justify-center gap-2" data-testid="view-booking-btn">
           View Booking <ArrowRight size={16} />
         </Link>
-        <button onClick={() => downloadConfirmationPdf(booking)} className="btn-primary flex items-center justify-center gap-2" data-testid="download-confirmation">
-          <Download size={16} /> Download Confirmation
+        <button
+          onClick={handleDownload}
+          disabled={downloading}
+          className="btn-primary flex items-center justify-center gap-2 disabled:opacity-70"
+          data-testid="download-confirmation"
+        >
+          <Download size={16} className={downloading ? "animate-bounce" : ""} />
+          {downloading ? "Preparing PDF..." : "Download Confirmation"}
         </button>
         <Link to="/dashboard" className="btn-ghost flex items-center justify-center gap-2" data-testid="go-dashboard">
           <Home size={16} /> Go to Dashboard
@@ -295,76 +317,3 @@ function PriceRow({ label, value }) {
   );
 }
 
-function downloadConfirmationPdf(booking) {
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const margin = 42;
-  const width = 510;
-  let y = 54;
-
-  const add = (text, size = 10, gap = 16, bold = false, color = [35, 45, 52]) => {
-    doc.setFont("helvetica", bold ? "bold" : "normal");
-    doc.setFontSize(size);
-    doc.setTextColor(...color);
-    const lines = doc.splitTextToSize(String(text || ""), width);
-    if (y + lines.length * (size + 3) > 790) { doc.addPage(); y = 54; }
-    doc.text(lines, margin, y);
-    y += lines.length * (size + 3) + gap;
-  };
-
-  // Branding header
-  doc.setFillColor(13, 92, 117);
-  doc.rect(0, 0, 595, 70, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.text("Voyage", margin, 42);
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text("Booking Confirmation", margin, 56);
-  y = 100;
-
-  add("BOOKING CONFIRMED", 20, 8, true, [13, 92, 117]);
-  add(`Booking ID: ${booking.booking_id}`, 12, 6, true);
-  add(`Transaction ID: ${booking.transaction_id || "—"}`, 10, 6);
-  add(`Status: ${booking.booking_status || "confirmed"} · Payment: Demo Payment Successful`, 10, 14);
-
-  const dest = booking.destination || {};
-  add("TRIP DETAILS", 13, 7, true, [13, 92, 117]);
-  add(`Destination: ${dest.name || "—"}, ${dest.country || ""}`, 10, 6);
-  add(`Duration: ${booking.duration_days || 0} days`, 10, 6);
-  if (booking.origin) add(`Origin: ${booking.origin}`, 10, 14);
-
-  const flight = booking.flight || {};
-  add("FLIGHT", 13, 7, true, [13, 92, 117]);
-  add(`${flight.airline || "—"}: ${flight.from || ""} → ${flight.to || ""}`, 10, 6);
-  add(`Duration: ${flight.duration || "—"} · Stops: ${flight.stops || "—"} · Price: ${flight.price || "—"}`, 10, 14);
-
-  const hotel = booking.hotel || {};
-  const room = booking.room || {};
-  add("HOTEL & ROOM", 13, 7, true, [13, 92, 117]);
-  add(`${hotel.name || "—"} · ${hotel.location || ""}`, 10, 6);
-  add(`Room: ${room.label || "—"} · Rooms: ${booking.num_rooms || 1} · Nights: ${booking.num_nights || 1}`, 10, 6);
-  add(`Rating: ${hotel.rating || "—"}/5 · Price/night: ${hotel.price_per_night || "—"}`, 10, 14);
-
-  if (booking.addons?.length > 0) {
-    add("ADD-ONS", 13, 7, true, [13, 92, 117]);
-    booking.addons.forEach((a) => add(`• ${a.name} — ${formatINR(a.price)}`, 10, 5));
-    y += 8;
-  }
-
-  const travelers = booking.travelers || {};
-  add("TRAVELER DETAILS", 13, 7, true, [13, 92, 117]);
-  add(`Contact: ${travelers.fullName || "—"} · ${travelers.email || ""} · ${travelers.phone || ""}`, 10, 6);
-  add(`Travelers: ${travelers.numTravelers || 1}`, 10, 14);
-
-  const p = booking.pricing || {};
-  add("PRICE BREAKDOWN", 13, 7, true, [13, 92, 117]);
-  add(`Subtotal: ${formatINR(p.subtotal)}`, 10, 5);
-  add(`Taxes & fees: ${formatINR(p.taxes)}`, 10, 5);
-  add(`Discount: − ${formatINR(p.discount)}`, 10, 5);
-  add(`Grand Total: ${formatINR(p.grandTotal)}`, 13, 10, true, [13, 92, 117]);
-
-  add("Demo Payment — No real money was charged. This is a simulated transaction for demonstration purposes only.", 9, 8, false, [231, 111, 81]);
-
-  doc.save(`booking-${booking.booking_id}.pdf`);
-}

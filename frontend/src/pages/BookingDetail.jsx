@@ -6,8 +6,7 @@ import { toast } from "sonner";
 import SmartImage from "@/components/SmartImage";
 import { formatINR } from "@/lib/bookingUtils";
 import { SUPPORT_EMAIL, mailtoLink } from "@/lib/siteConfig";
-import { ArrowLeft, Download, Calendar, Plane, BedDouble, Users, MapPin, Sparkles, CircleCheck as CheckCircle2, Clock, Mail, RefreshCw, Train } from "lucide-react";
-import { jsPDF } from "jspdf";
+import { ArrowLeft, Download, Calendar, Plane, BedDouble, Users, MapPin, Sparkles, Mail, RefreshCw, Train } from "lucide-react";
 
 export default function BookingDetail() {
   const { bookingId } = useParams();
@@ -15,6 +14,31 @@ export default function BookingDetail() {
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [resending, setResending] = useState(false);
+  const [downloadingKind, setDownloadingKind] = useState(null);
+
+  const handleDownload = async (kind = "confirmation") => {
+    if (downloadingKind || !booking?.booking_id) return;
+    setDownloadingKind(kind);
+    try {
+      const res = await api.get(`/bookings/${booking.booking_id}/pdf/${kind}`, {
+        responseType: "blob",
+      });
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const kindLabel = kind === "confirmation" ? "Confirmation" : "Itinerary";
+      link.setAttribute("download", `ChaloGhumne-${kindLabel}-${booking.booking_id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(`Could not generate PDF. Please contact ${SUPPORT_EMAIL}`);
+    } finally {
+      setDownloadingKind(null);
+    }
+  };
 
   useEffect(() => {
     if (!bookingId) { nav("/dashboard"); return; }
@@ -243,9 +267,26 @@ export default function BookingDetail() {
 
       {/* Actions */}
       <div className="mt-6 flex flex-wrap gap-3">
-        <button onClick={() => downloadPdf(booking)} className="btn-primary flex items-center gap-2" data-testid="booking-download">
-          <Download size={16} /> Download Confirmation
+        <button
+          onClick={() => handleDownload("confirmation")}
+          disabled={!!downloadingKind}
+          className="btn-primary flex items-center gap-2 disabled:opacity-70"
+          data-testid="booking-download"
+        >
+          <Download size={16} className={downloadingKind === "confirmation" ? "animate-bounce" : ""} />
+          {downloadingKind === "confirmation" ? "Preparing PDF..." : "Download Confirmation"}
         </button>
+        {booking.itinerary && (
+          <button
+            onClick={() => handleDownload("itinerary")}
+            disabled={!!downloadingKind}
+            className="btn-secondary flex items-center gap-2 disabled:opacity-70"
+            data-testid="booking-download-itinerary"
+          >
+            <Download size={16} className={downloadingKind === "itinerary" ? "animate-bounce" : ""} />
+            {downloadingKind === "itinerary" ? "Preparing PDF..." : "Download Itinerary"}
+          </button>
+        )}
         <Link to="/dashboard" className="btn-ghost flex items-center gap-2">
           Back to Dashboard
         </Link>
@@ -278,70 +319,3 @@ function PriceRow({ label, value }) {
   );
 }
 
-function downloadPdf(booking) {
-  const doc = new jsPDF({ unit: "pt", format: "a4" });
-  const margin = 42;
-  const width = 510;
-  let y = 54;
-
-  const add = (text, size = 10, gap = 16, bold = false, color = [35, 45, 52]) => {
-    doc.setFont("helvetica", bold ? "bold" : "normal");
-    doc.setFontSize(size);
-    doc.setTextColor(...color);
-    const lines = doc.splitTextToSize(String(text || ""), width);
-    if (y + lines.length * (size + 3) > 790) { doc.addPage(); y = 54; }
-    doc.text(lines, margin, y);
-    y += lines.length * (size + 3) + gap;
-  };
-
-  doc.setFillColor(13, 92, 117);
-  doc.rect(0, 0, 595, 70, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(22);
-  doc.text("Voyage", margin, 42);
-  doc.setFontSize(10);
-  doc.setFont("helvetica", "normal");
-  doc.text("Booking Confirmation", margin, 56);
-  y = 100;
-
-  const dest = booking.destination || {};
-  add(`${dest.name || "Your trip"}, ${dest.country || ""}`, 20, 8, true, [13, 92, 117]);
-  add(`Booking ID: ${booking.booking_id}`, 12, 6, true);
-  add(`Transaction: ${booking.transaction_id || "—"} · Status: ${booking.booking_status || "confirmed"}`, 10, 14);
-
-  add("TRIP", 13, 7, true, [13, 92, 117]);
-  add(`Duration: ${booking.duration_days || 0} days${booking.origin ? ` · From ${booking.origin}` : ""}`, 10, 14);
-
-  const flight = booking.flight || {};
-  add("FLIGHT", 13, 7, true, [13, 92, 117]);
-  add(`${flight.airline || "—"}: ${flight.from || ""} → ${flight.to || ""} · ${flight.price || ""}`, 10, 14);
-
-  const hotel = booking.hotel || {};
-  const room = booking.room || {};
-  add("HOTEL & ROOM", 13, 7, true, [13, 92, 117]);
-  add(`${hotel.name || "—"} · ${hotel.location || ""} · ★ ${hotel.rating || "—"}`, 10, 6);
-  add(`Room: ${room.label || "—"} · ${booking.num_rooms || 1} room(s) × ${booking.num_nights || 1} night(s)`, 10, 14);
-
-  if (booking.addons?.length > 0) {
-    add("ADD-ONS", 13, 7, true, [13, 92, 117]);
-    booking.addons.forEach((a) => add(`• ${a.name} — ${formatINR(a.price)}`, 10, 5));
-    y += 8;
-  }
-
-  const travelers = booking.travelers || {};
-  add("TRAVELERS", 13, 7, true, [13, 92, 117]);
-  add(`${travelers.fullName || "—"} · ${travelers.email || ""} · ${travelers.phone || ""}`, 10, 6);
-  add(`Travelers: ${travelers.numTravelers || 1}`, 10, 14);
-
-  const p = booking.pricing || {};
-  add("PRICE BREAKDOWN", 13, 7, true, [13, 92, 117]);
-  add(`Subtotal: ${formatINR(p.subtotal)}`, 10, 5);
-  add(`Taxes: ${formatINR(p.taxes)}`, 10, 5);
-  add(`Discount: − ${formatINR(p.discount)}`, 10, 5);
-  add(`Grand Total: ${formatINR(p.grandTotal)}`, 13, 10, true, [13, 92, 117]);
-
-  add("Demo Payment — No real money was charged.", 9, 8, false, [231, 111, 81]);
-
-  doc.save(`booking-${booking.booking_id}.pdf`);
-}

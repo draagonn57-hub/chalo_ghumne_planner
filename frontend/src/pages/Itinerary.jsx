@@ -1,12 +1,12 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { api, API } from "@/lib/api";
+import { api } from "@/lib/api";
 import { toast } from "sonner";
-import { jsPDF } from "jspdf";
+import { SUPPORT_EMAIL } from "@/lib/siteConfig";
 import SmartImage from "@/components/SmartImage";
 import styles from "./Itinerary.module.css";
-import { useTransport, isDateFuture } from "@/lib/useTransport";
+import { useTransport } from "@/lib/useTransport";
 import { useTrainFares } from "@/lib/useFare";
 
 import {
@@ -38,7 +38,6 @@ import {
   Snowflake,
   CloudLightning,
   Droplets,
-  Thermometer,
   AlertTriangle,
   RefreshCw,
   Wind,
@@ -47,7 +46,7 @@ import {
   Plus,
   Check,
   GripVertical,
-  X,
+  Download,
 } from "lucide-react";
 import ItineraryMap from "@/components/ItineraryMap";
 import CostBreakdown from "@/components/CostBreakdown";
@@ -299,6 +298,39 @@ function ItineraryView({
   const [showRefine, setShowRefine] = useState(false);
   const [refining, setRefining] = useState(false);
   const [dragData, setDragData] = useState(null);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  const handleDownloadPdf = async () => {
+    if (downloadingPdf) return;
+    setDownloadingPdf(true);
+    try {
+      const payload = {
+        ...localIt,
+        preferences: preferences || {},
+        transport_mode: transportMode,
+        selected_flight: localIt.flights?.[selectedFlight] || null,
+        selected_train: selectedTrain !== null ? localIt.trains?.[selectedTrain] : null,
+      };
+      const res = await api.post("/itinerary/pdf", payload, {
+        responseType: "blob",
+      });
+      const blob = new Blob([res.data], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      const destName = localIt.destination?.name || localIt.destination || localIt.title || "Trip";
+      const safeSlug = String(destName).replace(/[^a-zA-Z0-9-_]/g, "").trim() || "Trip";
+      link.setAttribute("download", `ChaloGhumne-Itinerary-${safeSlug}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      toast.error(`Could not generate PDF. Please contact ${SUPPORT_EMAIL}`);
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
 
   useEffect(() => {
     setLocalIt(it);
@@ -631,11 +663,13 @@ function ItineraryView({
           )}
 
           <button
-            onClick={() => downloadPdf(localIt)}
-            className="btn-secondary flex items-center gap-2"
+            onClick={handleDownloadPdf}
+            disabled={downloadingPdf}
+            className="btn-secondary flex items-center gap-2 disabled:opacity-70"
             data-testid="itinerary-download"
           >
-            Download itinerary
+            <Download size={16} className={downloadingPdf ? "animate-bounce" : ""} />
+            {downloadingPdf ? "Preparing PDF..." : "Download itinerary"}
           </button>
 
           {savedId && (
@@ -1425,8 +1459,13 @@ function ItineraryView({
             <CreditCard size={14} /> Book
           </button>
         )}
-        <button onClick={() => downloadPdf(localIt)} className="btn-secondary text-sm" data-testid="itinerary-download-mobile">
-          PDF
+        <button
+          onClick={handleDownloadPdf}
+          disabled={downloadingPdf}
+          className="btn-secondary text-sm disabled:opacity-70"
+          data-testid="itinerary-download-mobile"
+        >
+          {downloadingPdf ? "Preparing..." : "PDF"}
         </button>
         {savedId && (
           <button onClick={onDelete} className="btn-ghost text-[#E76F51] text-sm flex items-center gap-1" data-testid="itinerary-delete-mobile">
@@ -2260,233 +2299,6 @@ function FeedbackBlock({ itineraryId }) {
   );
 }
 
-function downloadPdf(it) {
-  const doc = new jsPDF({
-    unit: "pt",
-    format: "a4",
-  });
-
-  const margin = 42;
-  const width = 510;
-  let y = 54;
-
-  const add = (
-    text,
-    size = 10,
-    gap = 16,
-    bold = false
-  ) => {
-    doc.setFont(
-      "helvetica",
-      bold ? "bold" : "normal"
-    );
-
-    doc.setFontSize(size);
-
-    const lines = doc.splitTextToSize(
-      String(text || ""),
-      width
-    );
-
-    if (
-      y + lines.length * (size + 3) >
-      790
-    ) {
-      doc.addPage();
-      y = 54;
-    }
-
-    doc.text(lines, margin, y);
-
-    y +=
-      lines.length * (size + 3) +
-      gap;
-  };
-
-  doc.setTextColor(13, 92, 117);
-
-  add(
-    it.title || "Your Voyage",
-    24,
-    10,
-    true
-  );
-
-  doc.setTextColor(35, 45, 52);
-
-  add(it.summary, 11, 12);
-
-  add(
-    `Estimated total: ${
-      it.estimated_total_cost || "See plan"
-    }`,
-    11,
-    18,
-    true
-  );
-
-  add(
-    "DESTINATIONS",
-    13,
-    7,
-    true
-  );
-
-  (it.destinations || []).forEach(
-    (d) => {
-      add(
-        `${d.name}, ${d.country} — ${d.why}`,
-        10,
-        8
-      );
-    }
-  );
-
-  add(
-    "DAY-BY-DAY PLAN",
-    13,
-    7,
-    true
-  );
-
-  (it.days || []).forEach((day) => {
-    add(
-      `Day ${day.day}: ${day.title} (${
-        day.location || ""
-      })`,
-      11,
-      4,
-      true
-    );
-
-    [
-      "morning",
-      "afternoon",
-      "evening",
-    ].forEach((slot) => {
-      add(
-        `${slot}: ${
-          day[slot]?.activity || "—"
-        }${
-          day[slot]?.landmark
-            ? ` · ${day[slot].landmark}`
-            : ""
-        }`,
-        10,
-        3
-      );
-    });
-
-    add(
-      `Food: breakfast — ${
-        day.food?.breakfast || "—"
-      }; lunch — ${
-        day.food?.lunch || "—"
-      }; dinner — ${
-        day.food?.dinner || "—"
-      }`,
-      10,
-      8
-    );
-  });
-
-  add(
-    "HOTELS",
-    13,
-    7,
-    true
-  );
-
-  (it.hotels || []).forEach((h) => {
-    add(
-      `${h.name} · ${h.location} · ${
-        h.price_per_night
-      } · ${h.rating}/5 · ${(
-        h.amenities || []
-      ).join(", ")}`,
-      10,
-      6
-    );
-  });
-
-  if (it.flights?.length > 0) {
-    add(
-      "FLIGHTS (ESTIMATED)",
-      13,
-      7,
-      true
-    );
-
-    (it.flights || []).forEach((f) => {
-      add(
-        `${f.airline}: ${f.from} → ${
-          f.to
-        } · ${f.price} · ${
-          f.duration
-        } · ${f.stops}`,
-        10,
-        6
-      );
-    });
-  }
-
-  if (it.transport?.length > 0) {
-    add(
-      "TRANSPORT",
-      13,
-      7,
-      true
-    );
-
-    (it.transport || []).forEach((t) => {
-      add(
-        `${t.mode}: ${t.from} → ${
-          t.to
-        } · ${t.price} · ${
-          t.duration
-        } · ${t.provider || ""}`,
-        10,
-        6
-      );
-    });
-  }
-
-  add(
-    "LANDMARKS",
-    13,
-    7,
-    true
-  );
-
-  (it.landmarks || []).forEach((l) => {
-    add(
-      `${l.name} — ${
-        l.location
-      }: ${l.description}`,
-      10,
-      6
-    );
-  });
-
-  add(
-    "TIPS",
-    13,
-    7,
-    true
-  );
-
-  (it.tips || []).forEach((tip) => {
-    add(`• ${tip}`, 10, 6);
-  });
-
-  const filename = (
-    it.title || "voyage-itinerary"
-  )
-    .replace(/[^a-z0-9]+/gi, "-")
-    .toLowerCase();
-
-  doc.save(`${filename}.pdf`);
-}
 
 function AdjustDayModal({ day, index, onClose, onSave }) {
   const [form, setForm] = useState(() => ({

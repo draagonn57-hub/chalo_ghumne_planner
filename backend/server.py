@@ -9,7 +9,7 @@ from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import List, Optional, Dict, Any
 
-from fastapi import FastAPI, APIRouter, HTTPException, Depends
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, Response, Request
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -50,6 +50,8 @@ from transport_service import (
     start_bridge as start_railkit_bridge,
     stop_bridge as stop_railkit_bridge,
 )
+from pdf_service import build_confirmation_pdf, build_itinerary_pdf
+from image_service import fetch_itinerary_photos
 
 
 # ============================================================
@@ -1781,6 +1783,88 @@ async def delete_itinerary(
 
 
 # ============================================================
+# ITINERARY PDF EXPORT
+# ============================================================
+
+@api.post("/itinerary/pdf")
+async def generate_itinerary_pdf_endpoint(
+    request: Request,
+    user=Depends(get_current_user),
+):
+    """
+    Generate professional itinerary PDF from user request body.
+    Requires login, validates size (max 1 MB), and fetches photos if available.
+    """
+    raw_body = await request.body()
+    if len(raw_body) > 1_048_576:
+        raise HTTPException(
+            status_code=413,
+            detail="Payload too large (max 1 MB)",
+        )
+
+    try:
+        import json
+        body = json.loads(raw_body)
+    except Exception:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid JSON payload",
+        )
+
+    if not isinstance(body, dict):
+        raise HTTPException(
+            status_code=400,
+            detail="Expected JSON object",
+        )
+
+    itin_id = body.get("id") or body.get("itin_id")
+    itinerary_data = body
+
+    # Prefer loading saved itinerary from database if it exists, merging real transport from body
+    if itin_id:
+        existing = await db.itineraries.find_one(
+            {"$or": [{"id": itin_id}, {"itin_id": itin_id}]},
+            {"_id": 0},
+        )
+        if existing:
+            base = existing.get("itinerary") if isinstance(existing.get("itinerary"), dict) else existing
+            merged = dict(base)
+            for k in ("flights", "trains", "selected_flight", "selected_train", "transport_mode", "destination"):
+                if k in body and body[k]:
+                    merged[k] = body[k]
+            itinerary_data = merged
+
+    photos = []
+    try:
+        photos = await fetch_itinerary_photos(itinerary_data, max_photos=8, db=db)
+    except Exception as exc:
+        logger.debug("Photo fetch for itinerary PDF failed: %s", exc)
+
+    try:
+        pdf_bytes = await asyncio.to_thread(build_itinerary_pdf, itinerary_data, photos)
+    except Exception as exc:
+        logger.error("Itinerary PDF generation failed: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail="Could not generate itinerary PDF",
+        )
+
+    dest = itinerary_data.get("destination") or {}
+    dest_name = (dest.get("name") if isinstance(dest, dict) else str(dest)) or "Trip"
+    safe_slug = "".join(c for c in dest_name if c.isalnum() or c in ("-", "_")).strip() or "Trip"
+    filename = f"ChaloGhumne-Itinerary-{safe_slug}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
+
+
+# ============================================================
 # FEEDBACK
 # ============================================================
 
@@ -2300,6 +2384,87 @@ async def cancel_booking(
     return {
         "message": "cancelled"
     }
+
+
+# ============================================================
+# BOOKING PDF DOWNLOAD
+# ============================================================
+
+@api.get("/bookings/{booking_id}/pdf/{kind}")
+async def get_booking_pdf(
+    booking_id: str,
+    kind: str,
+    user=Depends(get_current_user),
+):
+    kind_clean = (kind or "").strip().lower()
+    if kind_clean not in ("confirmation", "itinerary"):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid PDF kind. Expected 'confirmation' or 'itinerary'.",
+        )
+
+    doc = await db.bookings.find_one(
+        {"booking_id": booking_id},
+        {"_id": 0},
+    )
+
+    if not doc:
+        raise HTTPException(
+            status_code=404,
+            detail="Booking not found",
+        )
+
+    # Owner only (404 for others)
+    if (
+        doc.get("user_id") != user["user_id"]
+        and user.get("role") != "admin"
+    ):
+        raise HTTPException(
+            status_code=404,
+            detail="Booking not found",
+        )
+
+    photos = []
+    try:
+        photos = await fetch_itinerary_photos(doc, max_photos=8, db=db)
+    except Exception as exc:
+        logger.debug("Photo fetch failed for booking PDF %s: %s", booking_id, exc)
+
+    if kind_clean == "confirmation":
+        user_doc = await db.users.find_one({"id": doc.get("user_id")}, {"_id": 0})
+        user_info = user_doc or {
+            "name": doc.get("user_name") or "",
+            "email": doc.get("user_email") or "",
+            "phone": doc.get("user_phone") or "",
+        }
+        try:
+            pdf_bytes = await asyncio.to_thread(build_confirmation_pdf, doc, user_info, photos)
+        except Exception as exc:
+            logger.error("Confirmation PDF build failed for %s: %s", booking_id, exc)
+            raise HTTPException(
+                status_code=500,
+                detail="Could not generate confirmation PDF",
+            )
+        filename = f"ChaloGhumne-Confirmation-{booking_id}.pdf"
+    else:
+        try:
+            pdf_bytes = await asyncio.to_thread(build_itinerary_pdf, doc, photos)
+        except Exception as exc:
+            logger.error("Itinerary PDF build failed for %s: %s", booking_id, exc)
+            raise HTTPException(
+                status_code=500,
+                detail="Could not generate itinerary PDF",
+            )
+        filename = f"ChaloGhumne-Itinerary-{booking_id}.pdf"
+
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
+
 
 
 # ============================================================

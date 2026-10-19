@@ -409,6 +409,9 @@ def _send_raw(msg, attempt: int = 1) -> bool:
         logger.error("SMTP failed after 2 attempts: %s", exc)
         return False
 
+_send_sync = _send_raw
+
+
 
 # ── Main async entry point ────────────────────────────────────────────────────
 
@@ -435,10 +438,18 @@ async def send_booking_email(booking: Dict[str, Any], user: Dict[str, Any]) -> b
     bid  = booking.get("booking_id", "unknown")
     dest = (booking.get("destination") or {}).get("name") or "your destination"
 
-    # ── Build PDFs ───────────────────────────────────────────────────
+    # ── Fetch watermark photos (bounded budget, graceful fallback) ────
+    images = []
     try:
-        conf_pdf = build_confirmation_pdf(booking, user)
-        itin_pdf = build_itinerary_pdf(booking)
+        from image_service import fetch_itinerary_photos
+        images = await fetch_itinerary_photos(booking, max_photos=8)
+    except Exception as exc:
+        logger.debug("Photo fetch for email skipped: %s", exc)
+
+    # ── Build PDFs in worker thread ───────────────────────────────────
+    try:
+        conf_pdf = await asyncio.to_thread(build_confirmation_pdf, booking, user, images)
+        itin_pdf = await asyncio.to_thread(build_itinerary_pdf, booking, images)
     except Exception as exc:
         logger.error("PDF generation failed for booking %s: %s", bid, exc)
         conf_pdf = b""
@@ -518,7 +529,7 @@ async def send_booking_email(booking: Dict[str, Any], user: Dict[str, Any]) -> b
 
     # ── Send in thread so event loop is not blocked ──────────────────
     try:
-        result = await asyncio.to_thread(_send_raw, outer)
+        result = await asyncio.to_thread(_send_sync, outer)
         if result:
             logger.info("Booking email sent to %s for booking %s", _mask_email(account_email), bid)
         return result
