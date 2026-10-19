@@ -37,6 +37,11 @@ PARSE_BASE     = os.environ.get("PARSE_IRCTC_BASE_URL", "").rstrip("/")
 SERPAPI_KEY    = os.environ.get("SERPAPI_KEY", "")
 SERPAPI_BASE   = "https://serpapi.com/search.json"
 
+# RapidAPI Railway (fallback when Parse is down)
+RAPIDAPI_KEY   = os.environ.get("RAPIDAPI_KEY", "")
+RAPIDAPI_HOST  = os.environ.get("RAPIDAPI_RAILWAY_HOST", "")
+RAPIDAPI_BASE  = "https://irctc-indian-railway-pnr-status.p.rapidapi.com"
+
 REQUEST_TIMEOUT = 45          # seconds — Parse IRCTC scrapes in real time, needs headroom
 
 # Cache TTLs (seconds)
@@ -140,17 +145,32 @@ def _parse_headers() -> dict:
     }
 
 async def _parse_post(endpoint: str, body: dict) -> dict:
-    """POST to Parse IRCTC. Raises RuntimeError on credits issues; returns body otherwise."""
+    """
+    POST to Parse IRCTC with timeout and error handling.
+    Returns response dict with _http_status added.
+    On timeout, returns 503 to trigger RapidAPI fallback.
+    Raises RuntimeError on auth/quota issues.
+    """
     url = f"{PARSE_BASE}/{endpoint}"
-    async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT) as client:
-        resp = await client.post(url, json=body, headers=_parse_headers())
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:  # 10s timeout (was 45s, too long)
+            resp = await client.post(url, json=body, headers=_parse_headers())
 
-    if resp.status_code in (429, 402):
-        _set_backoff()
-        raise RuntimeError("CREDITS_EXHAUSTED")
+        if resp.status_code in (429, 402):
+            _set_backoff()
+            raise RuntimeError("CREDITS_EXHAUSTED")
 
-    # Return the raw JSON regardless of status — callers inspect status_code
-    return {"_http_status": resp.status_code, **resp.json()}
+        return {"_http_status": resp.status_code, **resp.json()}
+    
+    except (httpx.TimeoutException, httpx.ConnectError, httpx.ReadTimeout) as e:
+        # Parse API timeout or connection issue — return 503 to trigger fallback
+        logger.warning("Parse API timeout/unavailable (%s): %s", type(e).__name__, str(e)[:100])
+        return {"_http_status": 503, "error": "Parse API timeout"}
+    
+    except Exception as e:
+        # Any other error — also trigger fallback
+        logger.error("Parse POST error (%s): %s", type(e).__name__, str(e)[:100])
+        return {"_http_status": 503, "error": str(e)[:50]}
 
 # ── City lookup tables ─────────────────────────────────────────────────────────
 
@@ -366,12 +386,11 @@ def _runs_on_date(running_days: dict, date_iso: str) -> bool:
 async def _fetch_trains_parse(
     from_code: str,
     to_code: str,
-    date_iso: str,      # YYYY-MM-DD
+    date_iso: str,
 ) -> list:
     """
-    POST /search_trains via Parse IRCTC.
+    Fetch trains via Parse IRCTC (primary) or RapidAPI (fallback).
     Handles deduplication: two simultaneous identical requests share one call.
-    Never called if backoff is active; caller raises with stale cache result.
     """
     cache_key = f"trains:{from_code}:{to_code}:{date_iso}"
 
@@ -381,7 +400,7 @@ async def _fetch_trains_parse(
         logger.info("cache hit  trains %s→%s %s", from_code, to_code, date_iso)
         return cached
 
-    # In-flight dedup: if another coroutine is already fetching this key, wait for it
+    # In-flight dedup
     if cache_key in _in_flight:
         logger.info("in-flight dedup trains %s→%s %s", from_code, to_code, date_iso)
         return await asyncio.shield(_in_flight[cache_key])
@@ -398,12 +417,29 @@ async def _fetch_trains_parse(
             "destination_station": to_code,
         }
         data = await _parse_post("search_trains", body)
-
         http_status = data.pop("_http_status", 200)
+
+        # If Parse times out (503), fallback to RapidAPI
+        if http_status == 503:
+            logger.warning("Parse API timeout (503) — falling back to RapidAPI")
+            trains = await _rapidapi_trains(from_code, to_code, date_iso)
+            if trains:
+                await _cache_set(cache_key, trains, TRAIN_TTL)
+                future.set_result(trains)
+                return trains
+            # If RapidAPI also fails, return empty
+            future.set_result([])
+            return []
+
+        if http_status == 429 or http_status == 402:
+            _set_backoff()
+            future.set_exception(RuntimeError("CREDITS_EXHAUSTED"))
+            raise RuntimeError("CREDITS_EXHAUSTED")
+
         if http_status != 200:
             raise RuntimeError(f"search_trains HTTP {http_status}")
 
-        # Response: {"data": {"trains": [...], "total_trains": N}}
+        # Parse response
         inner  = data.get("data") or data
         trains = (inner.get("trains") if isinstance(inner, dict) else None) or []
 
@@ -421,6 +457,72 @@ async def _fetch_trains_parse(
 
     finally:
         _in_flight.pop(cache_key, None)
+
+
+async def _rapidapi_trains(from_code: str, to_code: str, date_iso: str) -> list:
+    """Fallback train search via RapidAPI when Parse is down."""
+    headers = {
+        "X-RapidAPI-Key": RAPIDAPI_KEY,
+        "X-RapidAPI-Host": RAPIDAPI_HOST,
+    }
+    
+    # RapidAPI endpoint format: /between/{from}/{to}?date=DD-MM-YYYY
+    date_parts = date_iso.split("-")  # YYYY-MM-DD
+    date_formatted = f"{date_parts[2]}-{date_parts[1]}-{date_parts[0]}"  # DD-MM-YYYY
+    
+    url = f"{RAPIDAPI_BASE}/between/{from_code}/{to_code}?date={date_formatted}"
+    
+    try:
+        logger.info("RapidAPI fallback   trains %s→%s %s", from_code, to_code, date_iso)
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.get(url, headers=headers)
+        
+        if resp.status_code != 200:
+            logger.warning("RapidAPI HTTP %d", resp.status_code)
+            return []
+        
+        body = resp.json()
+        if not body.get("success"):
+            logger.warning("RapidAPI success=false")
+            return []
+        
+        # RapidAPI format: {"data": {"trains": [...]}}
+        trains_raw = (body.get("data") or {}).get("trains", [])
+        
+        result = []
+        for t in trains_raw:
+            # Map RapidAPI field names to our normalized format
+            running_str = t.get("running_days", "1111111")  # e.g., "1111111" = all days
+            running_days = {
+                "mon": running_str[0] == "1",
+                "tue": running_str[1] == "1",
+                "wed": running_str[2] == "1",
+                "thu": running_str[3] == "1",
+                "fri": running_str[4] == "1",
+                "sat": running_str[5] == "1",
+                "sun": running_str[6] == "1",
+            } if len(running_str) == 7 else {"mon": True, "tue": True, "wed": True, "thu": True, "fri": True, "sat": True, "sun": True}
+            
+            result.append({
+                "train_name": t.get("train_name", ""),
+                "train_number": t.get("train_no", ""),
+                "from_station": from_code,
+                "to_station": to_code,
+                "departure_time": t.get("from_time", ""),
+                "arrival_time": t.get("to_time", ""),
+                "duration": t.get("travel_time", ""),
+                "distance": "",
+                "available_classes": [],
+                "running_days": running_days,
+            })
+        
+        logger.info("RapidAPI found %d trains", len(result))
+        return result
+        
+    except Exception as e:
+        logger.error("RapidAPI fallback error: %s", e)
+        return []
+
 
 
 async def get_trains(
