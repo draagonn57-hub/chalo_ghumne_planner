@@ -78,11 +78,12 @@ function Shell() {
     <div className={`relative min-h-screen${isItineraryPage ? " itinerary-shell" : ""}`}
          style={isItineraryPage ? { background: "#EDE0CE" } : {}}>
       {/*
-        Global cycling background — only shown on non-Landing and non-Itinerary pages.
+        Global cycling background — only shown on non-Landing, non-Itinerary, and non-Auth pages.
         Landing has its own DynamicBackground inside the hero section.
         Itinerary pages have botanical beige background via CSS module.
+        Auth pages have dedicated snow mountain background.
       */}
-      {!isLanding && !isItineraryPage && (
+      {!isLanding && !isItineraryPage && !isAuthPage && (
         <DynamicBackground
           mode="cycle"
           overlayClassName=""
@@ -92,14 +93,14 @@ function Shell() {
 
       {/* All content renders above the background */}
       <div className="relative z-10 flex flex-col min-h-screen">
-        <Navbar />
+        {!isAuthPage && <Navbar />}
 
         {/*
           - Landing: its own background inside the hero, solid white sections below — no global bg
-          - Auth pages: transparent so cycling bg shows, they apply their own dark gradient overlay
+          - Auth pages: dedicated full-viewport snow-covered mountain background with centered glass card
           - All other pages: glassy overlay so cycling bg shows through frosted glass
         */}
-        <main className="flex-1 min-h-[calc(100vh-5rem)]">
+        <main className={isAuthPage ? "flex-1 min-h-screen" : "flex-1 min-h-[calc(100vh-5rem)]"}>
           <Routes>
 
           {/* ==================== PUBLIC ==================== */}
@@ -292,7 +293,7 @@ function Shell() {
         </Routes>
         </main>
 
-        <Footer />
+        {!isAuthPage && <Footer />}
       </div>
     </div>
   );
