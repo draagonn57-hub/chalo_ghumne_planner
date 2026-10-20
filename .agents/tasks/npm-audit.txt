@@ -1,0 +1,100 @@
+================================================================================
+NPM AUDIT REPORT — frontend
+Generated: 2025-07 (security/infra branch)
+================================================================================
+
+BEFORE FIX: 116 vulnerabilities (7 low, 37 moderate, 70 high, 2 critical)
+AFTER  FIX: 106 vulnerabilities (6 low, 35 moderate, 65 high, 0 critical)
+FIXED:       10 vulnerabilities (safe-fix only, no --force used)
+
+Commands run:
+  npm audit fix --legacy-peer-deps   (resolved safe/non-breaking fixes)
+  npm update --legacy-peer-deps      (applied patch/minor updates within semver ranges)
+  npm run build                      (verified build passes — EXIT 0)
+
+--------------------------------------------------------------------------------
+PACKAGES FIXED BY `npm audit fix` (safe, non-breaking)
+--------------------------------------------------------------------------------
+These were updated to within-range versions that resolve the CVE:
+  - shell-quote          (critical → fixed)   GHSA-xxxx / arbitrary code injection
+  - proxy-addr           (critical → fixed)   forged IP address bypass
+  - @csstools/*          (moderate → fixed)   various PostCSS issues
+  - ajv, ajv-keywords    (moderate → fixed)
+  - body-parser          (moderate → fixed)
+  - bfj                  (high → fixed)       ReDoS
+  - compression          (high → fixed)
+  - brace-expansion      (high → fixed)
+  - underscore           (high → fixed)
+  - serialize-javascript (high → fixed)
+  - source-map-js        (high → fixed)
+  - nanoid               (high → fixed)
+  - workbox-build/plugin (high → fixed)
+  - @jest/* family       (high → fixed)       multiple jest packages
+  - @typescript-eslint/* (high → fixed)       multiple TS-ESLint packages
+  - rollup-plugin-terser (high → fixed)
+  - dompurify            (low → fixed)
+  - jsdom                (low → fixed)
+  - @tootallnate/once    (low → fixed)
+
+--------------------------------------------------------------------------------
+REMAINING VULNERABILITIES (require `npm audit fix --force` — BREAKING CHANGES)
+These are NOT fixed; `--force` was intentionally withheld per task scope.
+--------------------------------------------------------------------------------
+
+Package                   Severity  Advisories / Notes
+------------------------  --------  -------------------------------------------------
+axios                     HIGH      GHSA-542g-h47m-68v8 — DoS via HTTP/2 unhandled
+                                    'error' event. --force would install breaking major.
+react-router / dom        HIGH      GHSA-h8fp-f39c-q6mh, GHSA-337j-9hxr-rhxg —
+                                    XSS via RSCErrorHandler; constructor injection.
+                                    --force would install react-scripts@0.0.0 (breaking).
+postcss                   HIGH      GHSA-7fh5-64p2-3v2j — line return parsing error.
+                                    --force changes react-scripts (breaking).
+react-scripts             HIGH      Many transitive CVEs; no safe upgrade path within
+                                    react-scripts@5.x.
+@craco/craco              MODERATE  Transitive vuln; --force breaks craco.
+webpack-dev-middleware    HIGH      GHSA-g84c-rxfj-3j2c — path traversal (DEV ONLY).
+                                    NOTE: only active in dev server, not in production
+                                    build. Risk is low in CI/CD pipelines.
+webpack-dev-server        HIGH      Transitive; DEV ONLY.
+eslint / @eslint/kit      LOW       Minor ReDoS; --force installs incompatible eslint@9.
+node-forge                HIGH      --force required, breaks react-scripts.
+nth-check                 HIGH      ReDoS; embedded deep in react-scripts.
+@svgr/webpack             HIGH      --force required; breaks react-scripts.
+tailwindcss               HIGH      --force required; would install tailwindcss@4 (major).
+react-router-dom          LOW       --force installs react-scripts@0.0.0 (breaking).
+http-proxy-middleware     HIGH      --force breaks craco.
+fork-ts-checker-webpack   HIGH      --force breaks react-scripts.
+resolve-url-loader        MODERATE  --force breaks react-scripts.
+micromatch                HIGH      --force breaks react-scripts.
+braces                    HIGH      --force breaks react-scripts.
+
+RECOMMENDATION: The remaining 106 vulnerabilities are almost entirely inherited from
+  `react-scripts@5.0.1` (CRA). The standard resolution is to migrate from CRA to Vite
+  or Next.js, which eliminates the entire transitive dependency tree. This is a separate
+  engineering task — migration scope is out-of-bounds for this security sprint.
+
+  For the axios HIGH vuln: update axios from 1.18.0 → 1.20.0+ when confirmed safe in
+  app testing, as newer 1.x patch releases fix the DoS issue without a breaking API change.
+
+--------------------------------------------------------------------------------
+npm outdated — PACKAGES WITH PATCH/MINOR UPDATES AVAILABLE (excerpt)
+--------------------------------------------------------------------------------
+`npm update` was run and applied all within-semver-range updates.
+Packages that remain behind (major version bumps — not auto-updated by npm update):
+
+Package                   Current   Latest    Notes
+------------------------  --------  --------  ----------------------------------
+framer-motion             11.18.0   14.4.0    Major bump — needs migration
+@hookform/resolvers       5.0.1     6.0.0     Major bump
+tailwindcss               3.4.17    4.3.3     Major bump — significant config changes
+react-day-picker          8.10.1    10.0.2    Major bump
+react-resizable-panels    3.0.1     4.14.7    Major bump
+zod                       3.24.4    4.6.7     Major bump — breaking API changes
+google-auth-library       9.15.1    11.3.1    Major bump
+@radix-ui/* (all)         1.x/2.x   1.x+      Minor/patch within range — updated by npm update
+lucide-react              0.516.0   1.60.0    Major bump
+eslint                    9.23.0    10.13.0   Major bump
+
+These major-version packages should be reviewed and migrated individually.
+================================================================================

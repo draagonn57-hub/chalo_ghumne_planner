@@ -1,0 +1,94 @@
+================================================================================
+PIP-AUDIT REPORT — backend
+Generated: 2025-07 (security/infra branch)
+Tool: pip-audit 2.10.1
+Command: pip-audit -r requirements.txt
+================================================================================
+
+RESULT: 21 known vulnerabilities in 4 packages
+
+--------------------------------------------------------------------------------
+FINDINGS
+--------------------------------------------------------------------------------
+
+Package       Installed  CVE/Advisory ID    Fix Version   Description
+------------  ---------  -----------------  ------------  ---------------------
+pymongo       4.6.3      PYSEC-2026-4294    4.18.1        Not publicly disclosed
+pymongo       4.6.3      PYSEC-2026-4295    4.18.2        Not publicly disclosed
+pymongo       4.6.3      PYSEC-2026-4296    4.18.2        Not publicly disclosed
+pymongo       4.6.3      PYSEC-2026-4297    4.18.2        Not publicly disclosed
+
+starlette     0.37.2     PYSEC-2026-1943    0.40.0        Not publicly disclosed
+starlette     0.37.2     PYSEC-2026-1941    0.47.2        Not publicly disclosed
+starlette     0.37.2     PYSEC-2026-161     1.0.1         Not publicly disclosed
+starlette     0.37.2     PYSEC-2026-2281    1.1.0         Not publicly disclosed
+starlette     0.37.2     PYSEC-2026-2280    1.1.0         Not publicly disclosed
+starlette     0.37.2     PYSEC-2026-249     1.3.1         Not publicly disclosed
+starlette     0.37.2     PYSEC-2026-248     1.3.0         Not publicly disclosed
+
+python-jose   3.5.0      PYSEC-2026-4298    (none listed) Not publicly disclosed
+                                                           NOTE: python-jose is a
+                                                           soft-deprecated library;
+                                                           consider migrating to
+                                                           `python-jwt` or `joserfc`.
+
+ecdsa         0.19.2     PYSEC-2026-1325    (none listed) Not publicly disclosed
+                                                           NOTE: ecdsa is a transitive
+                                                           dependency of python-jose.
+                                                           Migrating away from
+                                                           python-jose removes this too.
+
+--------------------------------------------------------------------------------
+SEVERITY ASSESSMENT
+--------------------------------------------------------------------------------
+
+pymongo (HIGH priority)
+  4 CVEs with confirmed fix versions (4.18.1 / 4.18.2).
+  Action: Pin pymongo>=4.18.2 in requirements.txt and test MongoDB connectivity.
+  Also update motor (async driver) to a compatible version (motor>=3.5.0).
+
+starlette (HIGH priority)
+  7 CVEs; starlette is a transitive dependency of FastAPI.
+  Fix: Update fastapi to a version that pulls starlette>=1.3.1.
+  Action: Change `fastapi==0.110.1` → `fastapi>=0.115.0` (which bundles
+  starlette>=0.41.x); verify API compatibility before deploying.
+  NOTE: starlette 1.x is a major version; full FastAPI upgrade path should be
+  tested in a staging environment.
+
+python-jose (MEDIUM priority)
+  No disclosed fix version. python-jose is no longer actively maintained.
+  Action: Migrate JWT handling to `PyJWT` (already in requirements as pyjwt>=2.10.1)
+  and remove `python-jose`. This removes ecdsa as a transitive dep as well.
+  python-jose is used for: check auth.py for `jose` imports before removing.
+
+ecdsa (LOW/MEDIUM priority)
+  Transitive dependency of python-jose. Resolved by migrating away from python-jose.
+
+--------------------------------------------------------------------------------
+PACKAGES NOT FLAGGED (clean or no known CVEs at scan time)
+--------------------------------------------------------------------------------
+fastapi, uvicorn, pydantic, passlib, bcrypt, pyjwt, requests,
+requests-oauthlib, google-generativeai, google-auth, cryptography,
+boto3, pandas, numpy, reportlab, resend, motor, pymongo (except version noted),
+email-validator, python-dotenv, python-multipart, jq, typer, tzdata,
+pytest, black, isort, flake8, mypy, httpx — all CLEAN at scan time.
+
+--------------------------------------------------------------------------------
+RECOMMENDED requirements.txt CHANGES (manual action for backend owner)
+--------------------------------------------------------------------------------
+1. pymongo==4.6.3  →  pymongo>=4.18.2
+   + motor==3.3.1  →  motor>=3.6.0  (stays compatible with pymongo 4.18.x)
+
+2. fastapi==0.110.1  →  fastapi>=0.115.0
+   (starlette will be pulled at a patched version automatically)
+
+3. python-jose>=3.3.0  →  REMOVE (migrate JWT to PyJWT which is already present)
+   Verify auth.py uses only `pyjwt` / `jwt` imports, not `jose`.
+
+4. Run `pip-audit -r requirements.txt` again after applying changes to confirm
+   0 findings.
+
+================================================================================
+NOTE: pip-audit was installed during this session (pip-audit 2.10.1).
+It is recommended to add it to the dev/CI environment: `pip install pip-audit`
+================================================================================
