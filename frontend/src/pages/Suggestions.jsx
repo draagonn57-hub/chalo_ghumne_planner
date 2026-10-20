@@ -722,6 +722,8 @@ export default function Suggestions({ mode }) {
 
   return (
     <>
+      {/* Hide the suggestions page while compare modal is open */}
+      {!compareOpen && (
       <div className="max-w-6xl mx-auto px-6 py-10 sm:py-14 pb-28 sm:pb-14">
         <div className="tp-card p-8 sm:p-10">
           {/* Back button */}
@@ -878,8 +880,10 @@ export default function Suggestions({ mode }) {
           </div>
         </div>
       </div>
+      )}{/* end !compareOpen */}
 
-      {/* Mobile compare bar */}
+      {/* Mobile compare bar — also hidden when compare is open */}
+      {!compareOpen && (
       <div className="sm:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-100 bg-white/95 backdrop-blur-md px-4 py-3 shadow-[0_-8px_24px_-12px_rgba(13,92,117,0.2)]">
         <div className="flex items-center gap-3">
           {selectedCount > 0 && (
@@ -906,6 +910,7 @@ export default function Suggestions({ mode }) {
           <p className="text-xs text-slate-500 mt-2 text-center">Select at least 2 places to compare</p>
         )}
       </div>
+      )}{/* end mobile bar !compareOpen */}
 
       <CompareModal
         open={compareOpen}
