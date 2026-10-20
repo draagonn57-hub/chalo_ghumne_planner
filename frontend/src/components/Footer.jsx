@@ -5,11 +5,13 @@ export default function Footer() {
   return (
     <footer className="mt-24 border-t border-slate-200 bg-[#0D5C75] text-slate-100" data-testid="footer">
       <div className="max-w-7xl mx-auto px-6 sm:px-10 py-14 grid gap-10 md:grid-cols-4">
+
+        {/* Brand + business details */}
         <div>
           <div className="flex items-center gap-2">
             <img
               src="/assets/images/logo.png"
-              alt="Chalo Ghumne"
+              alt="Chalo Ghumne — AI travel planner logo"
               className="w-12 h-12 object-contain rounded-full bg-white/10"
             />
             <div className="font-display text-3xl">Chalo Ghumne</div>
@@ -18,26 +20,37 @@ export default function Footer() {
             Journeys designed by intelligence, told with soul. Your next
             adventure is a few questions away.
           </p>
+          {/* Required by Consumer Protection (E-Commerce) Rules 2020 */}
+          <address className="mt-5 not-italic text-xs text-slate-400 space-y-1">
+            <p><strong className="text-slate-300">[BUSINESS_NAME]</strong></p>
+            <p>[BUSINESS_ADDRESS]</p>
+            <p>GSTIN: <span className="text-slate-300">[GSTIN]</span></p>
+            <p>CIN: <span className="text-slate-300">[CIN_OR_REG_NUMBER]</span></p>
+          </address>
         </div>
 
+        {/* Explore */}
         <div>
           <div className="eyebrow text-slate-300">Explore</div>
-          <ul className="mt-4 space-y-2.5 text-sm">
+          <ul className="mt-4 space-y-2.5 text-sm" role="list">
             <li><Link to="/destinations" className="text-slate-200 hover:text-white transition-colors">Destinations</Link></li>
             <li><Link to="/plan" className="text-slate-200 hover:text-white transition-colors">Plan a trip</Link></li>
             <li><Link to="/dashboard" className="text-slate-200 hover:text-white transition-colors">My trips</Link></li>
           </ul>
         </div>
 
+        {/* Legal — NEW */}
         <div>
-          <div className="eyebrow text-slate-300">Company</div>
-          <ul className="mt-4 space-y-2.5 text-sm">
-            <li><span className="text-slate-200">About</span></li>
-            <li><span className="text-slate-200">Careers</span></li>
-            <li><span className="text-slate-200">Press</span></li>
+          <div className="eyebrow text-slate-300">Legal</div>
+          <ul className="mt-4 space-y-2.5 text-sm" role="list">
+            <li><Link to="/privacy" className="text-slate-200 hover:text-white transition-colors">Privacy Policy</Link></li>
+            <li><Link to="/terms" className="text-slate-200 hover:text-white transition-colors">Terms &amp; Conditions</Link></li>
+            <li><Link to="/cookie-policy" className="text-slate-200 hover:text-white transition-colors">Cookie Policy</Link></li>
+            <li><Link to="/cancellation-policy" className="text-slate-200 hover:text-white transition-colors">Cancellation &amp; Refund Policy</Link></li>
           </ul>
         </div>
 
+        {/* Contact */}
         <div>
           <div className="eyebrow text-slate-300">Contact</div>
           <p className="mt-4 text-sm text-slate-200">
@@ -49,6 +62,12 @@ export default function Footer() {
               {SUPPORT_EMAIL}
             </a>
           </p>
+          <p className="mt-1 text-xs text-slate-400">
+            Grievance Officer:{" "}
+            <a href="mailto:[GRIEVANCE_OFFICER_EMAIL]" className="underline hover:text-white">
+              [GRIEVANCE_OFFICER_EMAIL]
+            </a>
+          </p>
           <a
             href={mailtoLink("Chalo Ghumne support")}
             className="inline-block mt-3 text-sm font-semibold text-white bg-white/10 hover:bg-white/20 transition-colors px-4 py-2 rounded-full"
@@ -57,14 +76,18 @@ export default function Footer() {
             Send us an email
           </a>
           <p className="text-sm text-slate-400 mt-3">Made with wanderlust — 2026</p>
-          <p className="text-xs text-slate-400 mt-2">Demo project · no real bookings</p>
+          <p className="text-xs text-slate-400 mt-1">Demo project · No real bookings · No real charges</p>
         </div>
       </div>
 
       <div className="border-t border-white/10">
         <div className="max-w-7xl mx-auto px-6 sm:px-10 py-5 text-xs text-slate-400 flex flex-wrap justify-between gap-2">
           <span>© 2026 Chalo Ghumne. All rights reserved.</span>
-          <span>Powered by AI, crafted with care.</span>
+          <div className="flex gap-4">
+            <Link to="/privacy" className="hover:text-white transition-colors">Privacy</Link>
+            <Link to="/terms" className="hover:text-white transition-colors">Terms</Link>
+            <Link to="/cookie-policy" className="hover:text-white transition-colors">Cookies</Link>
+          </div>
         </div>
       </div>
     </footer>

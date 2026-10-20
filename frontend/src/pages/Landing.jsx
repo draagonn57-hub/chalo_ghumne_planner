@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useLang } from "@/lib/LangContext";
 import { useAuth } from "@/lib/AuthContext";
-import { Sparkles, MapPinned, Wand2, ArrowRight, Star, Compass } from "lucide-react";
+import { Sparkles, MapPinned, Wand2, ArrowRight, Compass } from "lucide-react";
 import DynamicBackground from "@/components/DynamicBackground";
 
 export default function Landing() {
@@ -53,9 +53,7 @@ export default function Landing() {
 
             {/* Issue 6 fix: increased top margin from mt-14 → mt-20 for breathing room */}
             <div className="mt-20 flex items-center gap-6 text-sm text-white/80">
-              <div className="flex items-center gap-2"><Star size={16} className="fill-[#F2B48A] text-[#F2B48A]" /> 4.9 avg on 12k trips</div>
-              <div className="hidden sm:block w-px h-4 bg-white/30" />
-              <div className="hidden sm:flex items-center gap-2"><MapPinned size={16} /> 180+ destinations</div>
+              <div className="flex items-center gap-2"><MapPinned size={16} /> 180+ destinations supported</div>
             </div>
           </div>
         </div>
