@@ -56,14 +56,21 @@ export default function Footer() {
           >
             Send us an email
           </a>
-          <p className="text-sm text-slate-400 mt-3">Made with wanderlust — 2026</p>
+          <p className="text-sm text-slate-400 mt-3">
+            Made with wanderlust — {new Date().getFullYear()}
+          </p>
+          {process.env.REACT_APP_BUILD_DATE && (
+            <p className="text-xs text-slate-400 mt-1">
+              Updated {process.env.REACT_APP_BUILD_DATE}
+            </p>
+          )}
           <p className="text-xs text-slate-400 mt-2">Demo project · no real bookings</p>
         </div>
       </div>
 
       <div className="border-t border-white/10">
         <div className="max-w-7xl mx-auto px-6 sm:px-10 py-5 text-xs text-slate-400 flex flex-wrap justify-between gap-2">
-          <span>© 2026 Chalo Ghumne. All rights reserved.</span>
+          <span>© {new Date().getFullYear()} Chalo Ghumne. All rights reserved.</span>
           <span>Powered by AI, crafted with care.</span>
         </div>
       </div>
