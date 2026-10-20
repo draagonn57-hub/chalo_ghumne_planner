@@ -1,0 +1,26 @@
+{
+  "id": "FEAT-004",
+  "type": "feat",
+  "description": "Forms, modals, copy, UTM. Creates reusable utilities/components and wires ConfirmModal into Itinerary.jsx (replacing window.confirm) and captureUtm() into App.js. Does NOT touch index.css (FEAT-001 owns it; .form-error/.form-success CSS already added). Depends on FEAT-001/002/003 (App.js already has the FEAT-003 mounts to append captureUtm after).",
+  "status": "pending",
+  "steps": [
+    "#8 Copy button: Create frontend/src/components/CopyButton.jsx. Props: text (string), className. Button label 'Copy'; onClick uses navigator.clipboard.writeText(text) with a fallback to a hidden textarea + document.execCommand('copy'); on success show 'Copied!' for 2s then revert. aria-label reflects state; the 'Copied!' text is in an aria-live region. Commit: feat: add copy button (#8).",
+    "#12 Password toggle: Create frontend/src/components/PasswordInput.jsx — a reusable password input with an Eye/EyeOff (lucide-react) toggle button inside the input wrapper; aria-label='Show password'/'Hide password', aria-pressed={shown}; toggles input type between 'password' and 'text'. DO NOT modify Auth.jsx: it is passwordless (email + 6-digit OTP, no type='password' inputs exist) and the task forbids changing auth logic / editing anything but password wrappers. Ship as a standalone reusable component. Commit: feat: add password visibility toggle (#12).",
+    "#13 UTM tracking: Create frontend/src/lib/utmTracking.js exporting captureUtm(), getUtmParams(), attachUtmToPayload(payload). captureUtm() reads utm_source/utm_medium/utm_campaign/utm_term/utm_content from window.location.search (URLSearchParams); if localStorage['cg-cookie-consent'] === 'true' persist the object to sessionStorage['cg-utm'], else store in a module-level variable. getUtmParams() returns the captured object (sessionStorage first, else module var). attachUtmToPayload(payload) returns {...payload, ...utmParams} (only non-empty utm values). In frontend/src/App.js call captureUtm() once on mount (inside Shell via useEffect, or in App). Commit: feat: add UTM tracking (#13).",
+    "#14 Form states: Create frontend/src/lib/formUtils.js exporting useFormState() returning { error, success, setError, setSuccess, reset } (useState-based). Consumers render error/success with aria-live='polite'. Utilities only — do NOT rewrite Auth.jsx. .form-error/.form-success CSS already in index.css from FEAT-001. Commit: feat: add form success/error states (#14).",
+    "#15 Confirm modal + Itinerary wiring: Create frontend/src/components/ConfirmModal.jsx. Props: open, title, message, confirmLabel, cancelLabel, onConfirm, onCancel, danger. Render with Framer Motion AnimatePresence; role='dialog' aria-modal='true' aria-labelledby (the title id); focus trap (trap Tab within dialog), Escape calls onCancel, initial focus on Cancel button, restore focus to trigger on close. danger=true styles confirm button coral/red. Then edit frontend/src/pages/Itinerary.jsx: in ItineraryDetail add const [confirmOpen, setConfirmOpen] = useState(false); change onDelete to set the modal open instead of window.confirm; create doDelete that runs the existing api.delete + nav('/dashboard') on success; pass onDelete={() => setConfirmOpen(true)} to ItineraryView for the Delete button (data-testid='itinerary-delete'); render <ConfirmModal open={confirmOpen} title='Delete trip' message='Delete this trip? This cannot be undone.' confirmLabel='Delete' cancelLabel='Cancel' danger onConfirm={doDelete} onCancel={() => setConfirmOpen(false)} /> in ItineraryDetail. Remove the window.confirm call. Commit: feat: add confirmation modals (#15)."
+  ],
+  "acceptance_criteria": [
+    "npm run build passes with no errors",
+    "Opening a saved itinerary and clicking Delete shows ConfirmModal (no native window.confirm); Escape/cancel closes; confirm deletes and navigates to /dashboard",
+    "UTM params in the URL are captured on load (sessionStorage when consent=true, else in-memory)",
+    "CopyButton, PasswordInput, ConfirmModal, formUtils, utmTracking all importable with no console errors"
+  ],
+  "verification": [
+    "cd frontend && npm run build  (must succeed, 0 errors)",
+    "Manually: open /itinerary/<id>, click Delete -> modal appears; press Escape -> closes; click Delete -> trip removed and on /dashboard",
+    "grep window.confirm frontend/src/pages/Itinerary.jsx -> no matches (the call was removed)"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

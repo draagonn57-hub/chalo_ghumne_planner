@@ -1,0 +1,21 @@
+{
+  "id": "FEAT-002",
+  "type": "feat",
+  "description": "Site search + mobile-menu accessibility. Both edit Navbar.jsx only (no index.css — FEAT-001 owns it). Depends on FEAT-001 only because Navbar already received the dark toggle in FEAT-001; build on top of that Navbar.",
+  "status": "pending",
+  "steps": [
+    "#2 Site search: Create frontend/src/components/SearchModal.jsx. Build a static list of real pages from the confirmed App.js routes: / (Landing - 'Plan your perfect journey'), /destinations ('Browse destinations'), /login ('Log in'), /signup ('Create account'), /forgot ('Passwordless sign-in help'), /reset ('Reset sign-in'), /plan ('Choose planning mode'), /plan/questionnaire ('Trip questionnaire'), /plan/choose ('Enter a destination manually'), /plan/recommended ('AI recommended suggestions'), /itinerary/suggestions ('Itinerary suggestions'), /itinerary/preview ('Preview itinerary'), /itinerary/:id ('Your saved itinerary'), /dashboard ('My trips'), /profile ('Your profile'), /admin ('Admin console'), /booking ('Start a booking'), /booking/checkout ('Demo checkout'), /booking/confirmation/:bookingId ('Booking confirmation'), /bookings/:bookingId ('Booking details'). Modal: input + filtered results (case-insensitive match over name/description/path); selecting a result calls useNavigate(path) and closes. Keyboard: Ctrl/Cmd+K opens, Escape closes, ArrowUp/Down moves active index, Enter activates. Focus trap; restore focus to trigger on close; role='dialog' aria-modal='true' aria-label='Site search'. Respect prefers-reduced-motion (skip entrance animation). In frontend/src/components/Navbar.jsx add a Search (lucide-react) icon button that opens the modal (local useState) and wire the global keydown listener for Ctrl/Cmd+K. Commit: feat: add site search (#2).",
+    "#4 Mobile menu a11y: In frontend/src/components/Navbar.jsx the mobile menu already closes on route change (existing useEffect on loc.pathname). Add: Escape closes the mobile menu (keydown listener when mobileOpen). On the hamburger button add aria-expanded={mobileOpen}, aria-controls='navbar-mobile-menu', aria-label='Toggle menu'. Give the mobile menu panel id='navbar-mobile-menu'. Enhance only — do not rebuild. Commit: feat: add mobile menu accessibility (#4)."
+  ],
+  "acceptance_criteria": [
+    "npm run build passes with no errors",
+    "Ctrl/Cmd+K opens SearchModal, Escape closes it, arrow keys + Enter navigate to a real route",
+    "Hamburger button has aria-expanded/aria-controls/aria-label and Escape closes the mobile menu"
+  ],
+  "verification": [
+    "cd frontend && npm run build  (must succeed, 0 errors)",
+    "Manually: press Ctrl+K, type 'dashboard', Enter -> navigates to /dashboard (or login redirect); press Escape -> focus returns to the search button"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

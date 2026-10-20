@@ -21,6 +21,7 @@ from __future__ import annotations
 import os
 import time
 import logging
+import shutil
 import asyncio
 import subprocess
 import sys
@@ -155,8 +156,10 @@ def start_bridge() -> None:
     env = {**os.environ, "RAILKIT_API_KEY": RAILKIT_API_KEY, "RAILKIT_BRIDGE_PORT": str(RAILKIT_BRIDGE_PORT)}
 
     try:
+        node_exe = shutil.which("node") or r"C:\Program Files\nodejs\node.exe"
+
         _bridge_proc = subprocess.Popen(
-            ["node", str(server_mjs)],
+            [node_exe, str(server_mjs)],
             cwd=str(bridge_dir),
             env=env,
             stdout=subprocess.PIPE,

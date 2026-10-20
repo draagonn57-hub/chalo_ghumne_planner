@@ -1,0 +1,7 @@
+{
+  "task_id": "task-feat-ui-features",
+  "task_description": "Add 18 accessible UX features to the Chalo Ghumne React frontend (dark mode, site search, back-to-top, mobile menu a11y, loading, hover, scroll progress, copy button, print, sticky header scroll-margin, skip-to-content, password toggle, UTM, form states, confirm modals, last-updated, FAQ, floating contact) on branch feat/ui-features, one focused commit per feature.",
+  "status": "pending",
+  "feature_order": ["FEAT-001", "FEAT-002", "FEAT-003", "FEAT-004", "FEAT-005"],
+  "blocked_reason": null
+}

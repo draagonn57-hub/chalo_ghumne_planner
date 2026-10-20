@@ -1,0 +1,25 @@
+{
+  "id": "FEAT-001",
+  "type": "feat",
+  "description": "Theme, dark mode, and global CSS foundation. Owns ALL index.css edits for the whole task so no other FEAT touches index.css. Implements features #1 (dark mode), #5 (loading/Spinner), #6 (hover states), #9 (print stylesheet), #10 (sticky-header scroll-margin), plus the .skip-link and .form-error/.form-success CSS used by later FEATs. Foundational: dark mode + global CSS must land first.",
+  "status": "pending",
+  "steps": [
+    "#1 Dark mode: Create frontend/src/lib/ThemeContext.jsx exporting ThemeProvider + useTheme() (copy the createContext(null) + Provider + useXxx pattern from src/lib/LangContext.jsx). State 'light'|'dark'; on init read localStorage['cg-theme'], if unset follow window.matchMedia('(prefers-color-scheme: dark)').matches. Persist to 'cg-theme' on change and toggle document.documentElement.classList 'dark'. Add a BLOCKING <script> in <head> of frontend/public/index.html (before the root script) that reads 'cg-theme' (or prefers-color-scheme if unset) and adds class='dark' to <html> to prevent flash. In frontend/src/index.css add .dark overrides of the :root --tp-* vars (e.g. --tp-bg #1A2530, --tp-surface #233140, --tp-text #FDFBF7, --tp-muted, --tp-border; keep --tp-primary teal and --tp-secondary coral). In frontend/src/components/Navbar.jsx add a Sun/Moon (lucide-react) toggle button in the desktop nav and mobile menu bound to useTheme(). In frontend/src/App.js wrap <Shell/> with <ThemeProvider> (inside LangProvider). Commit: feat: add dark mode toggle (#1).",
+    "#5 Loading: Create frontend/src/components/Spinner.jsx — small accessible spinner; under prefers-reduced-motion: reduce fall back to a single pulsing dot (no rotation). The .skeleton class already exists in index.css — leave it. Commit: feat: add loading animations (#5).",
+    "#6 Hover: In frontend/src/index.css verify .tp-card:hover (lift, present), .btn-primary:hover (present), .btn-secondary:hover (present), .btn-ghost:hover (present). Change .tp-card transition to 'transition: all 200ms' so color/border changes animate (currently transform/box-shadow only). Commit: feat: add hover states (#6).",
+    "#9 Print: In frontend/src/index.css add a @media print block: hide nav, footer, .no-print, .floating-btn, #back-to-top, #scroll-progress, #floating-contact; black text on white; remove card shadows/backgrounds; force <details>/accordion open. Forward-compatible (those ids/classes are added by later FEATs). Commit: feat: add print stylesheet (#9).",
+    "#10 Scroll-margin: In frontend/src/index.css add '[id] { scroll-margin-top: 88px; }' so the sticky Navbar (h-20 ~80px + a little) never covers anchor targets. Commit: feat: add sticky header scroll-margin (#10).",
+    "CSS for later FEATs (still in index.css, this FEAT): add .skip-link (visually hidden until :focus, then visible top-left z-[100]) and .form-error (red) / .form-success (green) with aria-live-friendly styling. No commit of its own — fold into the #1 commit."
+  ],
+  "acceptance_criteria": [
+    "npm run build in frontend/ passes with no errors",
+    "Toggling dark mode adds/removes 'dark' on <html> and persists across reload (no flash due to the blocking script)",
+    ".skeleton, hover, print, scroll-margin, skip-link, form-error, form-success classes all exist in index.css after this FEAT"
+  ],
+  "verification": [
+    "cd frontend && npm run build  (must succeed, 0 errors)",
+    "Manually: load page, toggle Sun/Moon in Navbar, confirm <html class='dark'> and reload with no flash"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

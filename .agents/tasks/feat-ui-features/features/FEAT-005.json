@@ -1,0 +1,21 @@
+{
+  "id": "FEAT-005",
+  "type": "feat",
+  "description": "Content: expandable FAQ component + last-updated footer date. Edits craco.config.js (minimal define block) and Footer.jsx only. Independent of FEAT-002/003/004 except it runs last in order. No index.css changes.",
+  "status": "pending",
+  "steps": [
+    "#17 Expandable FAQ: Create frontend/src/components/FAQ.jsx. Props: items: [{question, answer}]. Use native <details>/<summary> for robust keyboard accessibility (or button + aria-expanded). Animate open/close respecting prefers-reduced-motion (e.g. a max-height/opacity transition that becomes instant under reduced-motion). Export the component for reuse. Commit: feat: add expandable FAQ (#17).",
+    "#16 Last updated: In frontend/craco.config.js add a webpack.define (or EnvironmentPlugin) block injecting REACT_APP_BUILD_DATE = JSON.stringify(new Date().toISOString().split('T')[0]) — keep the edit minimal (only the define section, leave the existing alias + jest config intact). In frontend/src/components/Footer.jsx replace the two hardcoded '2026' occurrences ('Made with wanderlust — 2026' and '© 2026 Chalo Ghumne...') with {new Date().getFullYear()} and add an 'Updated {process.env.REACT_APP_BUILD_DATE || new Date().getFullYear()}' line in the footer. Commit: feat: add last updated date (#16)."
+  ],
+  "acceptance_criteria": [
+    "npm run build passes with no errors and REACT_APP_BUILD_DATE is defined at build time",
+    "Footer shows the current year dynamically and an 'Updated <date>' line",
+    "FAQ component renders items as keyboard-operable accordions"
+  ],
+  "verification": [
+    "cd frontend && npm run build  (must succeed, 0 errors)",
+    "Manually: footer bottom shows current year + 'Updated YYYY-MM-DD'; FAQ items expand/collapse with Enter/Space and keyboard focus is visible"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}

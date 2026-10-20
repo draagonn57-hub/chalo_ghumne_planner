@@ -1,0 +1,24 @@
+{
+  "id": "FEAT-003",
+  "type": "feat",
+  "description": "Floating UI shell + skip-to-content. Creates three new fixed-position components (BackToTop, ScrollProgressBar, FloatingContact) and the skip-link, all mounted in App.js. Depends on FEAT-001 (.skip-link CSS exists) and FEAT-002 (Navbar done). BackToTop (bottom-6) and FloatingContact (bottom-20) must NOT overlap.",
+  "status": "pending",
+  "steps": [
+    "#3 Back-to-top: Create frontend/src/components/BackToTop.jsx. Fixed bottom-6 right-6; visible only after window.scrollY > 400; click smooth-scrolls to top (window.scrollTo({top:0, behavior:'smooth'})); under prefers-reduced-motion use behavior:'auto'. Add classes 'floating-btn no-print', id='back-to-top', aria-label='Back to top'. Mount in frontend/src/App.js inside Shell (after main). Commit: feat: add back-to-top button (#3).",
+    "#7 Scroll progress: Create frontend/src/components/ScrollProgressBar.jsx. Fixed top-0 left-0 h-[3px] bg-[#0D5C75], width = (scrollTop / (scrollHeight - clientHeight)) * 100%. id='scroll-progress', class 'no-print', aria-hidden='true'. Mount in frontend/src/App.js. Commit: feat: add scroll progress bar (#7).",
+    "#11 Skip link: In frontend/src/App.js add <a href='#main-content' className='skip-link'>Skip to content</a> as the FIRST focusable element inside the rendered tree (before Navbar), and add id='main-content' to the existing <main> wrapper. .skip-link CSS already in index.css from FEAT-001. Commit: feat: add skip-to-content link (#11).",
+    "#18 Floating contact: Create frontend/src/components/FloatingContact.jsx. Fixed bottom-20 right-6 (ABOVE BackToTop's bottom-6 so they don't overlap). MessageCircle (lucide-react) icon. onClick -> window.location.href = mailtoLink('Chalo Ghumne support') (import from @/lib/siteConfig) OR an <a href={mailtoLink(...)}> wrapping the button. Hover tooltip 'Contact us'. id='floating-contact', class 'floating-btn no-print', aria-label='Contact us'. Mount in frontend/src/App.js. Commit: feat: add floating contact button (#18)."
+  ],
+  "acceptance_criteria": [
+    "npm run build passes with no errors",
+    "BackToTop (bottom-6) and FloatingContact (bottom-20) are both visible at once with no overlap",
+    "Tab focus reaches the skip-link first; activating it moves focus to #main-content",
+    "All three floating/progress elements are hidden in print"
+  ],
+  "verification": [
+    "cd frontend && npm run build  (must succeed, 0 errors)",
+    "Manually: scroll down 400px+ -> back-to-top + floating-contact both show, stacked without overlap; scroll progress bar grows at top; Tab key -> skip link visible then focuses main"
+  ],
+  "blocked_reason": null,
+  "findings": ""
+}
