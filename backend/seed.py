@@ -4,8 +4,8 @@ import uuid
 from datetime import datetime, timezone
 from auth import hash_password
 
-ADMIN_EMAIL = "admin@tourplanner.com"
-ADMIN_PASSWORD = "Admin@12345"
+ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "admin@tourplanner.com")
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "Admin@12345")
 
 SEED_DESTINATIONS = [
     {"name": "Goa", "country": "India", "type": "national", "tags": ["beach", "nightlife", "relaxation"],

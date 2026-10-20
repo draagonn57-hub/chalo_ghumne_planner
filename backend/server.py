@@ -1,6 +1,7 @@
 """AI Tour Planner — FastAPI backend."""
 
 import os
+import sys
 import asyncio
 import uuid
 import random
@@ -17,6 +18,27 @@ from pydantic import BaseModel, EmailStr, Field
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / ".env")
+
+# ============================================================
+# STARTUP ENV VAR VALIDATION
+# Fail fast if required environment variables are missing.
+# ============================================================
+
+_REQUIRED_ENV_VARS = [
+    "MONGO_URL",
+    "DB_NAME",
+    "JWT_SECRET",
+    "GEMINI_API_KEY",
+]
+
+_missing = [v for v in _REQUIRED_ENV_VARS if not os.environ.get(v)]
+if _missing:
+    print(
+        f"[FATAL] Missing required environment variables: {', '.join(_missing)}\n"
+        "Set them in backend/.env (copy backend/.env.example and fill in values).",
+        file=sys.stderr,
+    )
+    sys.exit(1)
 
 from auth import (
     hash_password,
