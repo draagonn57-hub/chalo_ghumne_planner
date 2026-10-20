@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { toast } from "sonner";
 import { SUPPORT_EMAIL } from "@/lib/siteConfig";
 import SmartImage from "@/components/SmartImage";
+import ConfirmModal from "@/components/ConfirmModal";
 import styles from "./Itinerary.module.css";
 import { useTransport } from "@/lib/useTransport";
 import { useTrainFares } from "@/lib/useFare";
@@ -159,6 +160,7 @@ export function ItineraryDetail() {
 
   const [doc, setDoc] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const load = () => {
     api
@@ -215,8 +217,6 @@ export function ItineraryDetail() {
   };
 
   const onDelete = async () => {
-    if (!window.confirm("Delete this trip?")) return;
-
     try {
       await api.delete(`/itinerary/${id}`);
 
@@ -239,33 +239,45 @@ export function ItineraryDetail() {
   if (!doc) return null;
 
   return (
-    <ItineraryView
-      it={doc.itinerary}
-      preferences={doc.preferences}
-      startDate={doc.preferences?.start_date || ""}
-      savedId={id}
-      onSwap={onSwap}
-      onDelete={onDelete}
-      onUpdateDay={onUpdateDay}
-      onBook={() => nav(`/booking/itinerary/${id}`)}
-      onRefine={async (refinementData) => {
-        try {
-          const { data: refined } = await api.post(
-            `/itinerary/${id}/refine`,
-            refinementData
-          );
-          setDoc(refined);
-          toast.success("Trip refined!");
-          return refined;
-        } catch (err) {
-          toast.error(
-            err?.response?.data?.detail ||
-            "Refinement failed — endpoint not yet implemented"
-          );
-          throw err;
-        }
-      }}
-    />
+    <>
+      <ItineraryView
+        it={doc.itinerary}
+        preferences={doc.preferences}
+        startDate={doc.preferences?.start_date || ""}
+        savedId={id}
+        onSwap={onSwap}
+        onDelete={() => setConfirmOpen(true)}
+        onUpdateDay={onUpdateDay}
+        onBook={() => nav(`/booking/itinerary/${id}`)}
+        onRefine={async (refinementData) => {
+          try {
+            const { data: refined } = await api.post(
+              `/itinerary/${id}/refine`,
+              refinementData
+            );
+            setDoc(refined);
+            toast.success("Trip refined!");
+            return refined;
+          } catch (err) {
+            toast.error(
+              err?.response?.data?.detail ||
+              "Refinement failed — endpoint not yet implemented"
+            );
+            throw err;
+          }
+        }}
+      />
+      <ConfirmModal
+        open={confirmOpen}
+        title="Delete this trip?"
+        message="This action cannot be undone. Your itinerary will be permanently deleted."
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        danger
+        onConfirm={() => { setConfirmOpen(false); onDelete(); }}
+        onCancel={() => setConfirmOpen(false)}
+      />
+    </>
   );
 }
 
