@@ -1201,24 +1201,36 @@ function ItineraryView({
                       </div>
 
                       {/* Route timeline */}
-                      <div className="flex items-center gap-2 text-sm">
-                        <div className="flex-1 text-center">
-                          <div className="font-semibold text-base">{tr.departure_time}</div>
-                          <div className="text-slate-500 text-xs mt-0.5 line-clamp-1">{tr.from_station}</div>
-                        </div>
-                        <div className="flex flex-col items-center gap-0.5 px-2 shrink-0">
-                          <div className="text-[10px] text-slate-400">{tr.duration}</div>
-                          <div className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full border-2 border-[#0D5C75]" />
-                            <div className="w-14 h-0.5 bg-slate-200" />
-                            <div className="w-2 h-2 rounded-full bg-[#0D5C75]" />
+                      <div className="space-y-1.5">
+                        {/* Times + line row */}
+                        <div className="flex items-center gap-3">
+                          {/* Departure time + station */}
+                          <div className="shrink-0 w-16">
+                            <div className="font-semibold text-base leading-tight whitespace-nowrap">{tr.departure_time}</div>
+                            <div className="text-slate-500 text-xs mt-0.5 truncate" title={tr.from_station}>{tr.from_station}</div>
                           </div>
-                          {tr.stops && <div className="text-[10px] text-slate-400">{tr.stops}</div>}
+
+                          {/* Duration line */}
+                          <div className="flex-1 flex flex-col items-center gap-0.5 min-w-0">
+                            <div className="text-[10px] text-slate-400 whitespace-nowrap">{tr.duration}</div>
+                            <div className="flex items-center gap-1 w-full">
+                              <div className="w-2 h-2 rounded-full border-2 border-[#0D5C75] shrink-0" />
+                              <div className="flex-1 h-0.5 bg-slate-200" />
+                              <div className="w-2 h-2 rounded-full bg-[#0D5C75] shrink-0" />
+                            </div>
+                          </div>
+
+                          {/* Arrival time + station */}
+                          <div className="shrink-0 w-24 text-right">
+                            <div className="font-semibold text-base leading-tight whitespace-nowrap">{tr.arrival_time}</div>
+                            <div className="text-slate-500 text-xs mt-0.5 truncate text-right" title={tr.to_station}>{tr.to_station}</div>
+                          </div>
                         </div>
-                        <div className="flex-1 text-center">
-                          <div className="font-semibold text-base">{tr.arrival_time}</div>
-                          <div className="text-slate-500 text-xs mt-0.5 line-clamp-1">{tr.to_station}</div>
-                        </div>
+
+                        {/* Stops — own line so it never overlaps */}
+                        {tr.stops && (
+                          <div className="text-[10px] text-slate-400 truncate pl-1" title={tr.stops}>{tr.stops}</div>
+                        )}
                       </div>
 
                       {/* Class chips — fare fetched on first click */}
