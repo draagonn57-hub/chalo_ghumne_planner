@@ -608,7 +608,6 @@ async def send_otp(body: OtpSendIn):
             },
         )
     except Exception as error:
-        print(f"Resend delivery failed: {error}", flush=True)
         logger.error("Resend delivery failed: %s", error)
         raise HTTPException(
             status_code=500,
@@ -1024,7 +1023,7 @@ async def recommend_post(
         logger.exception("POST recommend: AI generation failed")
         raise HTTPException(
             status_code=502,
-            detail=f"AI generation failed: {str(e)[:200]}",
+            detail="We couldn't generate recommendations right now. Please try again.",
         )
 
     # 5. Post-filter already handled inside generate_similar_destinations.
@@ -1067,7 +1066,7 @@ async def recommend_destinations(
         logger.exception("GET recommend: AI generation failed")
         raise HTTPException(
             status_code=502,
-            detail=f"AI generation failed: {str(e)[:200]}",
+            detail="We couldn't generate recommendations right now. Please try again.",
         )
 
     return {
@@ -1123,7 +1122,7 @@ async def generate_for_place(
         logger.exception("Generate-for-place failed")
         raise HTTPException(
             status_code=502,
-            detail=f"AI generation failed: {str(e)[:200]}",
+            detail="We couldn't generate an itinerary right now. Please try again.",
         )
 
     # Inject train options for India-domestic journeys if AI didn't include them
@@ -1229,10 +1228,7 @@ async def generate_detail(
 
         raise HTTPException(
             status_code=502,
-            detail=(
-                "AI generation failed: "
-                f"{str(e)[:200]}"
-            ),
+            detail="We couldn't generate an itinerary right now. Please try again.",
         )
 
     # Inject train options for India-domestic journeys if AI didn't include them
@@ -1665,7 +1661,7 @@ async def ask_assistant(
         logger.exception("Assistant reply failed")
         raise HTTPException(
             status_code=502,
-            detail=f"Assistant error: {str(e)[:200]}",
+            detail="The assistant is unavailable right now. Please try again.",
         )
 
     return {"reply": reply}
@@ -1754,7 +1750,7 @@ async def refine_itinerary(
         logger.exception("Refinement failed")
         raise HTTPException(
             status_code=502,
-            detail=f"Refinement error: {str(e)[:200]}",
+            detail="We couldn't refine your itinerary right now. Please try again.",
         )
 
     await db.itineraries.update_one(
