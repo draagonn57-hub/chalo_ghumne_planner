@@ -2568,6 +2568,38 @@ async def flights_endpoint(
 app.include_router(api)
 
 
+# ============================================================
+# SECURITY HEADERS MIDDLEWARE
+# Sets defensive HTTP headers on every response.
+# ============================================================
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' https://accounts.google.com https://maps.googleapis.com; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        "font-src 'self' data:; "
+        "connect-src 'self' "
+        "https://accounts.google.com "
+        "https://maps.googleapis.com "
+        "https://api.unsplash.com "
+        "https://api.open-meteo.com "
+        "https://geocoding-api.open-meteo.com; "
+        "frame-ancestors 'none'"
+    )
+    response.headers["Strict-Transport-Security"] = (
+        "max-age=31536000; includeSubDomains"
+    )
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    return response
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
