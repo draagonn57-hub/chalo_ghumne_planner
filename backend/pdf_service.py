@@ -288,24 +288,36 @@ def _closing_block(destination: str, kind: str = "confirmation"):
         'Need help? <a href="mailto:' + support + '" color="' + TEAL_HEX + '">'
         + support + "</a>"
     )
-    inner = [
-        _spacer(6),
-        Paragraph("\U0001f334 " + msg,
-                  _ps("_cm", font_size=10, space_before=0, space_after=6)),
-        Paragraph(help_txt, _ps("_ch", font_size=8, color=MUTED_C)),
-        _spacer(4),
+
+    # Stack the message and help text as two rows in a single-column table
+    # so the full CONTENT_W is available for wrapping — no more cut-off text.
+    inner_rows = [
+        [Paragraph("\U0001f334 " + msg,
+                   _ps("_cm", font_size=10, space_before=6, space_after=6))],
+        [Paragraph(help_txt, _ps("_ch", font_size=8, color=MUTED_C, space_after=8))],
     ]
-    t = Table([inner], colWidths=[CONTENT_W])
+    t = Table(inner_rows, colWidths=[CONTENT_W - 28])   # 28 = 14 left + 14 right padding
     t.setStyle(TableStyle([
-        ("BACKGROUND",   (0, 0), (-1, -1), CREAM_C),
-        ("BOX",          (0, 0), (-1, -1), 1.5, CORAL_C),
-        ("LEFTPADDING",  (0, 0), (-1, -1), 14),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 14),
-        ("TOPPADDING",   (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING",(0, 0), (-1, -1), 0),
+        ("BACKGROUND",    (0, 0), (-1, -1), CREAM_C),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 0),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 0),
+        ("TOPPADDING",    (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+        ("VALIGN",        (0, 0), (-1, -1), "TOP"),
+    ]))
+
+    # Wrap in an outer single-cell table that provides the border and padding
+    outer = Table([[t]], colWidths=[CONTENT_W])
+    outer.setStyle(TableStyle([
+        ("BACKGROUND",    (0, 0), (-1, -1), CREAM_C),
+        ("BOX",           (0, 0), (-1, -1), 1.5, CORAL_C),
+        ("LEFTPADDING",   (0, 0), (-1, -1), 14),
+        ("RIGHTPADDING",  (0, 0), (-1, -1), 14),
+        ("TOPPADDING",    (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
         ("ROUNDEDCORNERS", [6]),
     ]))
-    return KeepTogether([_spacer(14), t, _spacer(8)])
+    return KeepTogether([_spacer(14), outer, _spacer(8)])
 
 
 def _confirmed_badge():
