@@ -14,6 +14,20 @@
   --tp-muted: #64748B;
   --tp-muted-light: #94A3B8;  /* replaces ad-hoc slate-400 / text-white/80 equivalents */
   --tp-border: #E2E8F0;
+  color-scheme: light;
+}
+
+/* Dark theme — overrides the design tokens when <html class="dark">.
+   Brand teal (--tp-primary) and coral (--tp-secondary) stay the same so
+   accents read well on dark surfaces. */
+.dark {
+  color-scheme: dark;
+  --tp-bg: #1A2530;
+  --tp-surface: #233140;
+  --tp-text: #FDFBF7;
+  --tp-muted: #94A3B8;
+  --tp-muted-light: #64748B;
+  --tp-border: #334155;
 }
 
 html, body, #root {
@@ -78,13 +92,16 @@ html, body, #root {
 }
 .btn-ghost:hover { background: rgba(13, 92, 117, 0.06); }
 
-/* Cards */
+/* ===========================================
+   Hover states: widen .tp-card transition to 'all' 200ms (Feature 6)
+   =========================================== */
 .tp-card {
-  background: #fff;
-  border: 1px solid #eef2f4;
+  background: var(--tp-surface);
+  border: 1px solid var(--tp-border);
   border-radius: 1.25rem;
   box-shadow: 0 4px 20px -6px rgba(13, 92, 117, 0.08);
-  transition: transform 300ms ease, box-shadow 300ms ease;
+  color: var(--tp-text);
+  transition: all 200ms ease;
 }
 .tp-card:hover {
   transform: translateY(-4px);
@@ -348,6 +365,86 @@ button[role="checkbox"]:focus-visible {
 
 }
 
+/* ===========================================
+   Dark-mode shim (FEAT-001)
+   Components hard-code Tailwind slate text/surfaces, so a dark `--tp-text`
+   would make that text invisible on the new dark `--tp-surface`. These rules
+   re-map slate text + light sub-surfaces ONLY inside .tp-card — the auth
+   glass card and hero/itinerary pages are NOT .tp-card, so they keep their
+   light-on-light look and stay readable. Form controls keep their focus ring.
+   =========================================== */
+.dark .tp-card .text-slate-900,
+.dark .tp-card .text-slate-800,
+.dark .tp-card .text-slate-700,
+.dark .tp-card .text-slate-600 { color: #cbd5e1; }
+.dark .tp-card .text-slate-500 { color: #94a3b8; }
+.dark .tp-card .text-slate-400 { color: #94a3b8; }
+
+.dark .tp-card .bg-slate-50,
+.dark .tp-card .bg-slate-100,
+.dark .tp-card .bg-slate-200 { background-color: #1e293b; }
+
+.dark .tp-card .border-slate-200:not(input):not(textarea):not(select),
+.dark .tp-card .border-slate-100:not(input):not(textarea):not(select) {
+  border-color: #334155;
+}
+
+/* Form controls inside cards: dark surface + light text, preserving focus border */
+.dark .tp-card input,
+.dark .tp-card textarea,
+.dark .tp-card select {
+  background-color: #1e293b;
+  color: var(--tp-text);
+}
+.dark .tp-card input:not(:focus),
+.dark .tp-card textarea:not(:focus),
+.dark .tp-card select:not(:focus) {
+  border-color: #334155;
+}
+.dark .tp-card input::placeholder,
+.dark .tp-card textarea::placeholder { color: #94a3b8; }
+
+/* ===========================================
+   Skip-to-content link + inline form states (FEAT-001)
+   Visually hidden until focused, then revealed top-left above all content.
+   =========================================== */
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 100;
+  transform: translateY(-150%);
+  background: var(--tp-primary);
+  color: #fff;
+  padding: 0.5rem 1rem;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.875rem;
+  box-shadow: 0 8px 24px -8px rgba(13, 92, 117, 0.5);
+  transition: transform 200ms ease;
+}
+.skip-link:focus {
+  transform: translateY(0);
+  outline: 3px solid var(--tp-secondary);
+  outline-offset: 2px;
+}
+
+/* Inline validation messages — aria-live friendly (kept small to avoid layout shift) */
+.form-error {
+  color: #dc2626;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  margin-top: 0.35rem;
+}
+.form-success {
+  color: #16a34a;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin-top: 0.35rem;
+}
+.dark .form-error { color: #f87171; }
+.dark .form-success { color: #4ade80; }
+
 /* Skeleton shimmer */
 @keyframes shimmer {
   0% { background-position: -400px 0; }
@@ -462,5 +559,72 @@ button[role="checkbox"]:focus-visible {
     transition-duration: 0.01ms !important;
   }
 
+}
+
+
+/* ===========================================
+   Scroll-margin for sticky header (Feature 10)
+   Ensures anchor targets aren't hidden under the 80px Navbar.
+   =========================================== */
+[id] {
+  scroll-margin-top: 88px;
+}
+
+
+/* ===========================================
+   Print stylesheet (Feature 9)
+   Hides navigation, floating buttons, and decorative elements.
+   Renders black text on white for readability.
+   =========================================== */
+@media print {
+  nav,
+  footer,
+  .no-print,
+  .floating-btn,
+  #back-to-top,
+  #scroll-progress,
+  #floating-contact,
+  .skip-link {
+    display: none !important;
+  }
+
+  body,
+  html {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  .tp-card,
+  .glass-card,
+  .page-bg {
+    background: #fff !important;
+    box-shadow: none !important;
+    border-color: #ccc !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+
+  /* Force accordion / details items open */
+  details {
+    display: block !important;
+  }
+  details > *:not(summary) {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+  }
+
+  a[href]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.75em;
+    color: #555;
+  }
+
+  /* Remove decorative backgrounds */
+  * {
+    background-image: none !important;
+    text-shadow: none !important;
+  }
 }
 

@@ -3,6 +3,32 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+        <!--
+            No-flash dark mode: set the `dark` class on <html> before first paint
+            based on the stored preference (or the OS preference when unset).
+            Must run synchronously in <head> to avoid a flash of the light theme.
+        -->
+        <script>
+            (function () {
+                try {
+                    var t = localStorage.getItem("cg-theme");
+                    if (t !== "light" && t !== "dark") {
+                        t =
+                            window.matchMedia &&
+                            window.matchMedia("(prefers-color-scheme: dark)").matches
+                                ? "dark"
+                                : "light";
+                    }
+                    if (t === "dark") {
+                        document.documentElement.classList.add("dark");
+                    }
+                } catch (e) {
+                    /* no-op: stay in light mode */
+                }
+            })();
+        </script>
+
         <meta name="theme-color" content="#0D5C75" />
         <meta
             name="description"

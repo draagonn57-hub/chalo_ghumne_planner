@@ -1,4 +1,5 @@
 import "@/App.css";
+import { useEffect } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -10,10 +11,15 @@ import { Toaster } from "sonner";
 
 import { AuthProvider, useAuth } from "@/lib/AuthContext";
 import { LangProvider } from "@/lib/LangContext";
+import { ThemeProvider } from "@/lib/ThemeContext";
+import { captureUtm } from "@/lib/utmTracking";
 
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import DynamicBackground from "@/components/DynamicBackground";
+import BackToTop from "@/components/BackToTop";
+import ScrollProgressBar from "@/components/ScrollProgressBar";
+import FloatingContact from "@/components/FloatingContact";
 
 import Landing from "@/pages/Landing";
 import { Login, Signup, ForgotPassword, ResetPassword } from "@/pages/Auth";
@@ -74,6 +80,11 @@ function Shell() {
   // Auth pages manage their own gradient overlay on top of the global background
   const isAuthPage = ["/login", "/signup", "/forgot", "/reset"].includes(location.pathname);
 
+  // Capture UTM params on mount (Feature 13)
+  useEffect(() => {
+    captureUtm();
+  }, []);
+
   return (
     <div className={`relative min-h-screen${isItineraryPage ? " itinerary-shell" : ""}`}
          style={isItineraryPage ? { background: "#EDE0CE" } : {}}>
@@ -91,8 +102,14 @@ function Shell() {
         />
       )}
 
+      {/* Scroll progress bar (Feature 7) */}
+      <ScrollProgressBar />
+
       {/* All content renders above the background */}
       <div className="relative z-10 flex flex-col min-h-screen">
+        {/* Skip-to-content link (Feature 11) — first focusable element */}
+        <a href="#main-content" className="skip-link">Skip to content</a>
+
         {!isAuthPage && <Navbar />}
 
         {/*
@@ -100,7 +117,7 @@ function Shell() {
           - Auth pages: dedicated full-viewport snow-covered mountain background with centered glass card
           - All other pages: glassy overlay so cycling bg shows through frosted glass
         */}
-        <main className={isAuthPage ? "flex-1 min-h-screen" : "flex-1 min-h-[calc(100vh-5rem)]"}>
+        <main id="main-content" className={isAuthPage ? "flex-1 min-h-screen" : "flex-1 min-h-[calc(100vh-5rem)]"}>
           <Routes>
 
           {/* ==================== PUBLIC ==================== */}
@@ -295,6 +312,10 @@ function Shell() {
 
         {!isAuthPage && <Footer />}
       </div>
+
+      {/* Floating UI (Features 3, 18) — outside the main flow, always on top */}
+      <BackToTop />
+      <FloatingContact />
     </div>
   );
 }
@@ -304,12 +325,14 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <LangProvider>
-          <Toaster
-            position="top-right"
-            richColors
-          />
+          <ThemeProvider>
+            <Toaster
+              position="top-right"
+              richColors
+            />
 
-          <Shell />
+            <Shell />
+          </ThemeProvider>
         </LangProvider>
       </AuthProvider>
     </BrowserRouter>
