@@ -1,7 +1,7 @@
 import { Link, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/lib/AuthContext";
 import { useLang } from "@/lib/LangContext";
-import { Globe as Globe2, ChevronDown, Menu, X } from "lucide-react";
+import { Globe as Globe2, ChevronDown, Menu, X, Home } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -77,6 +77,22 @@ export default function Navbar() {
 
         {/* Desktop nav */}
         <nav className="hidden md:flex items-center gap-1" ref={menuRef}>
+          {/* Home icon — only shown when not on the homepage */}
+          {loc.pathname !== "/" && (
+            <Link
+              to="/"
+              className="relative group p-2 rounded-full text-slate-500 hover:bg-slate-100 hover:text-[#0D5C75] transition-colors"
+              aria-label="Go to Homepage"
+              data-testid="nav-home"
+            >
+              <Home size={18} />
+              {/* Tooltip */}
+              <span className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 whitespace-nowrap rounded-full bg-[#1A2530] text-white text-[11px] font-medium px-2.5 py-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-150 z-50">
+                Go to Homepage
+              </span>
+            </Link>
+          )}
+
           {navLink("/destinations", "Destinations", "nav-destinations")}
           {user && navLink("/dashboard", t("dashboard"), "nav-dashboard")}
           {user?.role === "admin" && navLink("/admin", t("admin"), "nav-admin")}
@@ -161,6 +177,16 @@ export default function Navbar() {
             className="md:hidden overflow-hidden bg-[#FDFBF7] border-b border-slate-100"
           >
             <div className="px-6 py-4 space-y-2">
+              {loc.pathname !== "/" && (
+                <Link
+                  to="/"
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-[#0D5C75] transition-colors"
+                  data-testid="nav-home-mobile"
+                >
+                  <Home size={16} />
+                  Go to Homepage
+                </Link>
+              )}
               {navLink("/destinations", "Destinations", "nav-destinations-mobile")}
               {user && navLink("/dashboard", t("dashboard"), "nav-dashboard-mobile")}
               {user?.role === "admin" && navLink("/admin", t("admin"), "nav-admin-mobile")}
