@@ -315,7 +315,9 @@ The following changes were made during Task 2 (move hardcoded secrets to env var
 
 ### 7.4 `frontend/.env.example` (created)
 - Contains placeholder dummy values for all `REACT_APP_` frontend vars.
+
 - Contains placeholder dummy values for all `REACT_APP_` frontend vars.
+
 
 ### 7.5 `frontend/.env` — `REACT_APP_` key audit
 
@@ -324,6 +326,7 @@ All four variables in `frontend/.env` use the `REACT_APP_` prefix and will be em
 | Variable | Embedded in bundle | Safe to expose? | Action required |
 |---|---|---|---|
 | `REACT_APP_BACKEND_URL` | Yes | ✅ Yes — it's a URL, not a secret | None |
+
 | `REACT_APP_UNSPLASH_KEY` | Yes | ⚠ By Unsplash design, Access Keys are intended for client-side use. However, the same key is also on the backend (`backend/.env` as `REACT_APP_UNSPLASH_KEY`). The backend `image_service.py` reads it as `UNSPLASH_ACCESS_KEY` — so the backend `.env` entry with the `REACT_APP_` prefix is effectively unused by Python. Rename it in `backend/.env` to `UNSPLASH_ACCESS_KEY` to match what `image_service.py` actually reads. | Rename in `backend/.env` + rotate per section 4.10 |
 | `REACT_APP_GOOGLE_MAPS_API_KEY` | Yes | ⚠ HIGH — must be referrer-restricted in GCP | Restrict in GCP Console per section 4.11 |
 | `REACT_APP_GOOGLE_CLIENT_ID` | Yes | ✅ Public by OAuth design | Restrict authorised origins in GCP per section 4.12 |
@@ -348,6 +351,7 @@ All four variables in `frontend/.env` use the `REACT_APP_` prefix and will be em
 | `REACT_APP_BACKEND_URL` | Yes | ✅ Yes — it's a URL, not a secret | None |
 | `REACT_APP_UNSPLASH_KEY` | Yes | ⚠ By Unsplash design, Access Keys are intended for client-side use. However, the same key is also on the backend (`backend/.env` as `REACT_APP_UNSPLASH_KEY`). The backend `image_service.py` reads it as `UNSPLASH_ACCESS_KEY` — so the backend `.env` entry with the `REACT_APP_` prefix is effectively unused by Python. Rename it in `backend/.env` to `UNSPLASH_ACCESS_KEY` to match what `image_service.py` actually reads. | Rename in `backend/.env` + rotate per section 4.10 |
 | `REACT_APP_GOOGLE_MAPS_API_KEY` | Yes | ⚠ HIGH — must be referrer-restricted in GCP | Restrict in GCP Console per section 4.11 |
+
 | `REACT_APP_GOOGLE_CLIENT_ID` | Yes | ✅ Public by OAuth design | Restrict authorised origins in GCP per section 4.12 |
 
 **No actual backend secrets (DB passwords, JWT secret, SMTP password, etc.) are `REACT_APP_` prefixed.** The frontend `.env` does not expose backend credentials.
