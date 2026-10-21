@@ -20,7 +20,7 @@ export default function Destinations() {
       <div className="mt-8 flex gap-2">
         {[["all", "All"], ["national", "National"], ["international", "International"]].map(([k, l]) => (
           <button key={k} onClick={() => setFilter(k)}
-            className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${filter === k ? "bg-[#0D5C75] text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"}`}
+            className={`px-4 py-2 rounded-full text-sm font-semibold transition-colors ${filter === k ? "bg-[#0D5C75] text-white" : "bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#172030]"}`}
             data-testid={`dest-filter-${k}`}>{l}</button>
         ))}
       </div>
@@ -39,9 +39,9 @@ export default function Destinations() {
                 </div>
                 <span className="text-xs px-2.5 py-1 rounded-full bg-[#E76F51]/10 text-[#E76F51] font-semibold uppercase tracking-wide">{d.type}</span>
               </div>
-              <p className="text-slate-600 mt-4 text-sm leading-relaxed">{d.description}</p>
+              <p className="text-slate-600 dark:text-slate-300 mt-4 text-sm leading-relaxed">{d.description}</p>
               <div className="flex flex-wrap gap-1.5 mt-4">
-                {d.tags?.map((t) => <span key={t} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{t}</span>)}
+                {d.tags?.map((t) => <span key={t} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{t}</span>)}
               </div>
             </div>
           </div>

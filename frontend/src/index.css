@@ -116,12 +116,13 @@ html, body, #root {
 
 /* Wizard choice card */
 .choice-card {
-  background: #fff;
-  border: 2px solid #eef2f4;
+  background: var(--tp-surface);
+  border: 2px solid var(--tp-border);
   border-radius: 1.25rem;
   padding: 1.5rem;
   cursor: pointer;
   transition: border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
+  color: var(--tp-text);
 }
 .choice-card:hover {
   border-color: rgba(231, 111, 81, 0.5);
@@ -404,6 +405,116 @@ button[role="checkbox"]:focus-visible {
 .dark .tp-card input::placeholder,
 .dark .tp-card textarea::placeholder { color: #94a3b8; }
 
+/* choice-card: text inside wizard cards (which are NOT tp-card) */
+.dark .choice-card .text-slate-500,
+.dark .choice-card .text-slate-400 { color: #94a3b8; }
+
+/* Also catch slate text used directly on .choice-card children */
+.dark .choice-card .bg-slate-100 { background-color: #1e293b; }
+
+/* Standalone slate text classes used outside .tp-card context (e.g. section headers) */
+.dark .text-slate-800:not(.tp-card .text-slate-800),
+.dark .text-slate-700:not(.tp-card .text-slate-700) { color: #cbd5e1; }
+
+/* Dividers: h-px inside tp-card or choice-card */
+.dark .tp-card .bg-slate-100,
+.dark .choice-card .bg-slate-100 { background-color: #334155; }
+
+/* TravelAssistant panel — hardcoded bg-white */
+.dark [data-testid="assistant-panel"] {
+  background-color: #1e293b !important;
+  border-color: #334155 !important;
+}
+.dark [data-testid="assistant-panel"] .bg-slate-50 { background-color: #172030 !important; }
+.dark [data-testid="assistant-panel"] .border-slate-200 { border-color: #334155 !important; }
+.dark [data-testid="assistant-panel"] .text-slate-600,
+.dark [data-testid="assistant-panel"] .text-slate-700 { color: #cbd5e1 !important; }
+.dark [data-testid="assistant-panel"] .text-slate-400 { color: #94a3b8 !important; }
+.dark [data-testid="assistant-panel"] .bg-white { background-color: #233140 !important; }
+.dark [data-testid="assistant-panel"] input,
+.dark [data-testid="assistant-panel"] textarea {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}
+.dark [data-testid="assistant-panel"] input::placeholder,
+.dark [data-testid="assistant-panel"] textarea::placeholder { color: #94a3b8 !important; }
+.dark [data-testid="assistant-panel"] .text-slate-700.bg-white,
+.dark [data-testid="assistant-panel"] button.bg-white { background-color: #1e293b !important; border-color: #334155 !important; color: #cbd5e1 !important; }
+
+/* RefinePanel modal — hardcoded bg-[#FDFBF7] */
+.dark [data-testid="refine-panel"] {
+  background-color: #1e293b !important;
+}
+.dark [data-testid="refine-panel"] .text-slate-700,
+.dark [data-testid="refine-panel"] .text-slate-600 { color: #cbd5e1 !important; }
+.dark [data-testid="refine-panel"] .border-slate-200 { border-color: #334155 !important; }
+.dark [data-testid="refine-panel"] .border-slate-300 { border-color: #475569 !important; }
+.dark [data-testid="refine-panel"] .text-slate-600 { color: #94a3b8 !important; }
+.dark [data-testid="refine-panel"] .bg-slate-50,
+.dark [data-testid="refine-panel"] .hover\:bg-slate-50:hover { background-color: #172030 !important; }
+.dark [data-testid="refine-panel"] .bg-\[#FDFBF7\] { background-color: #233140 !important; }
+.dark [data-testid="refine-panel"] textarea {
+  background-color: #172030 !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}
+.dark [data-testid="refine-panel"] textarea::placeholder { color: #94a3b8 !important; }
+
+/* Destinations filter buttons — bg-white border variant */
+.dark .tp-card button.bg-white { background-color: #1e293b !important; border-color: #334155 !important; color: #cbd5e1 !important; }
+.dark .tp-card button.bg-white:hover,
+.dark .tp-card button.hover\:bg-slate-50:hover { background-color: #172030 !important; }
+
+/* Profile form inputs with hardcoded bg-white */
+.dark [data-testid="profile-form"] input {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+}
+
+/* Questionnaire date input hardcoded bg-white */
+.dark [data-testid="wizard"] input[type="date"] {
+  background-color: #1e293b !important;
+  color: #f1f5f9 !important;
+  border-color: #334155 !important;
+  color-scheme: dark;
+}
+
+/* Review box in questionnaire: bg-slate-50/60 hardcoded */
+.dark [data-testid="wizard-review"] .bg-slate-50\/60 { background-color: rgba(30, 41, 59, 0.6) !important; }
+.dark [data-testid="wizard-review"] .border-slate-100 { border-color: #334155 !important; }
+.dark [data-testid="wizard-review"] .text-slate-800 { color: #e2e8f0 !important; }
+
+/* Suggestions page preference row buttons */
+.dark .tp-card .border-slate-200 button,
+.dark .tp-card button.border-slate-200 {
+  border-color: #334155;
+  color: #94a3b8;
+}
+
+/* Landing: "How it works" and destination card text */
+.dark .tp-card .text-slate-600 { color: #94a3b8; }
+
+/* Inline text badge bg-slate-100/text-slate-600 (estimate pills, tags) */
+.dark .tp-card .bg-slate-100.text-slate-500,
+.dark .tp-card .bg-slate-100.text-slate-600 {
+  background-color: #1e293b;
+  color: #94a3b8;
+}
+
+/* CostBreakdown: donut center text */
+.dark .tp-card .text-slate-800 { color: #e2e8f0; }
+.dark .tp-card .text-slate-700 { color: #cbd5e1; }
+
+/* CostBreakdown note banners */
+.dark .tp-card .bg-amber-50 { background-color: rgba(120, 53, 15, 0.2) !important; }
+.dark .tp-card .border-amber-200 { border-color: rgba(217, 119, 6, 0.4) !important; }
+.dark .tp-card .text-amber-800 { color: #fcd34d !important; }
+.dark .tp-card .bg-emerald-50 { background-color: rgba(6, 78, 59, 0.2) !important; }
+.dark .tp-card .border-emerald-200 { border-color: rgba(16, 185, 129, 0.4) !important; }
+.dark .tp-card .text-emerald-800 { color: #6ee7b7 !important; }
+
 /* ===========================================
    Skip-to-content link + inline form states (FEAT-001)
    Visually hidden until focused, then revealed top-left above all content.
@@ -542,6 +653,10 @@ button[role="checkbox"]:focus-visible {
   background: rgba(253, 251, 247, 0.88);
   backdrop-filter: blur(6px) saturate(120%);
   -webkit-backdrop-filter: blur(6px) saturate(120%);
+}
+
+.dark .page-bg {
+  background: rgba(26, 37, 48, 0.92);
 }
 
 @media (prefers-reduced-motion: reduce) {

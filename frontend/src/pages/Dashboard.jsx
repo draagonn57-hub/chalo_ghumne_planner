@@ -208,7 +208,7 @@ export default function Dashboard() {
                       </div>
                     )}
 
-                    <div className="mt-5 flex items-center gap-4 text-sm text-slate-500 border-t border-slate-100 pt-4">
+                    <div className="mt-5 flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400 border-t border-slate-100 dark:border-slate-700 pt-4">
                       <span className="inline-flex items-center gap-1">
                         <Clock size={14} />
                         {dayCount} {dayCount === 1 ? "day" : "days"}
@@ -333,8 +333,8 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                      <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-4">
-                        <span className="text-xs text-slate-400">
+                      <div className="mt-4 flex items-center justify-between border-t border-slate-100 dark:border-slate-700 pt-4">
+                        <span className="text-xs text-slate-400 dark:text-slate-500">
                           {formatDate(b.created_at)}
                         </span>
 

@@ -237,7 +237,7 @@ export default function Questionnaire() {
                       value={state.start_date}
                       min={new Date().toISOString().split("T")[0]}
                       onChange={(e) => setState({ ...state, start_date: e.target.value })}
-                      className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:border-[#E76F51] focus:outline-none transition-colors"
+                      className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 focus:border-[#E76F51] focus:outline-none transition-colors [color-scheme:light] dark:[color-scheme:dark]"
                       data-testid="wizard-start-date"
                     />
                     {state.start_date && (
@@ -310,8 +310,8 @@ export default function Questionnaire() {
                   <div className="flex items-start gap-3 px-5 py-4 rounded-2xl bg-[#E76F51]/5 border border-[#E76F51]/15 mb-8">
                     <Sparkles size={18} className="text-[#E76F51] mt-0.5 shrink-0" />
                     <div>
-                      <span className="font-semibold text-slate-800 text-sm">Make it your kind of trip!</span>
-                      <p className="text-slate-500 text-sm mt-0.5">Choose as many interests as you like. Mix and match your favorites to create a trip that suits you.</p>
+                      <span className="font-semibold text-slate-800 dark:text-slate-100 text-sm">Make it your kind of trip!</span>
+                      <p className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">Choose as many interests as you like. Mix and match your favorites to create a trip that suits you.</p>
                     </div>
                   </div>
                   <div className={`grid gap-4 ${current.options.length > 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}>
@@ -403,7 +403,7 @@ export default function Questionnaire() {
             <p className="text-slate-500 mt-3">
               We'll find four destinations that fit your travel style.
             </p>
-            <div className="border border-slate-100 rounded-2xl p-6 mt-8 grid sm:grid-cols-2 gap-4 text-sm bg-slate-50/60">
+            <div className="border border-slate-100 dark:border-slate-700 rounded-2xl p-6 mt-8 grid sm:grid-cols-2 gap-4 text-sm bg-slate-50/60 dark:bg-slate-800/40">
               {[
                 ["Budget", state.budget],
                 ["Travel type", TRAVEL_TYPE_LABELS[state.travel_type] || state.travel_type],
@@ -416,7 +416,7 @@ export default function Questionnaire() {
               ].map(([key, value]) => (
                 <div key={key}>
                   <div className="eyebrow">{key}</div>
-                  <div className="mt-1 text-slate-800 capitalize">{value}</div>
+                  <div className="mt-1 text-slate-800 dark:text-slate-100 capitalize">{value}</div>
                 </div>
               ))}
             </div>

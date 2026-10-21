@@ -42,13 +42,13 @@ export default function Profile() {
         <label className="block">
           <span className="text-xs uppercase tracking-widest text-slate-500 font-semibold">Display name</span>
           <input value={name} onChange={(e) => setName(e.target.value)}
-            className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:border-[#E76F51] focus:outline-none"
+            className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 focus:border-[#E76F51] focus:outline-none"
             data-testid="profile-name" />
         </label>
         <label className="block">
           <span className="text-xs uppercase tracking-widest text-slate-500 font-semibold">Avatar URL (optional)</span>
           <input value={avatar} onChange={(e) => setAvatar(e.target.value)} placeholder="https://…"
-            className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:border-[#E76F51] focus:outline-none"
+            className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 focus:border-[#E76F51] focus:outline-none"
             data-testid="profile-avatar" />
         </label>
         <button className="btn-primary" disabled={busy} data-testid="profile-save">{busy ? "Saving…" : "Save changes"}</button>

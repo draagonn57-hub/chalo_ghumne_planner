@@ -81,7 +81,7 @@ export default function Landing() {
                 <span className="font-display text-3xl text-[#E76F51]/70">{s.n}</span>
               </div>
               <h3 className="font-display text-2xl mt-6">{s.title}</h3>
-              <p className="text-slate-600 mt-3 leading-relaxed">{s.desc}</p>
+              <p className="text-slate-600 dark:text-slate-300 mt-3 leading-relaxed">{s.desc}</p>
             </div>
           ))}
         </div>
@@ -109,8 +109,8 @@ export default function Landing() {
                   <h3 className="font-display text-2xl">{d.name}</h3>
                   <span className="text-xs px-2.5 py-1 rounded-full bg-[#E76F51]/10 text-[#E76F51] font-semibold uppercase tracking-wide">{d.type}</span>
                 </div>
-                <p className="text-sm text-slate-500 mt-1">{d.country}</p>
-                <p className="text-slate-600 mt-4 text-sm line-clamp-2">{d.description}</p>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{d.country}</p>
+                <p className="text-slate-600 dark:text-slate-300 mt-4 text-sm line-clamp-2">{d.description}</p>
               </div>
             </div>
           ))}

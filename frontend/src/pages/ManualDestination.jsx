@@ -246,7 +246,7 @@ export default function ManualDestination() {
                     key={c.v}
                     onClick={() => setCompanions(c.v)}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                      companions === c.v ? "bg-[#E76F51] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      companions === c.v ? "bg-[#E76F51] text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
                     }`}
                     data-testid={`manual-companions-${c.v}`}
                   >
@@ -267,7 +267,7 @@ export default function ManualDestination() {
                     key={opt.v}
                     onClick={() => toggleInterest(opt.v)}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                      interests.includes(opt.v) ? "bg-[#0D5C75] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      interests.includes(opt.v) ? "bg-[#0D5C75] text-white" : "bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600"
                     }`}
                     data-testid={`manual-interest-${opt.v}`}
                   >
@@ -333,10 +333,10 @@ function BudgetChoice({ option, estimate, selected, onClick, testId }) {
         <Icon size={20} />
       </div>
       <div className="font-display text-xl mt-3">{option.label}</div>
-      <div className="text-slate-500 text-sm mt-0.5">{option.desc}</div>
+      <div className="text-slate-500 dark:text-slate-400 text-sm mt-0.5">{option.desc}</div>
       {estimate && (
         <div className={`mt-2.5 text-xs font-semibold px-2 py-1 rounded-lg inline-block transition-colors ${
-          selected ? "bg-[#E76F51]/15 text-[#E76F51]" : "bg-slate-100 text-slate-500"
+          selected ? "bg-[#E76F51]/15 text-[#E76F51]" : "bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400"
         }`}>
           ~{estimate}
         </div>

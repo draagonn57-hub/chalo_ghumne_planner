@@ -46,7 +46,7 @@ export default function RefinePanel({ open, onClose, onSubmit, loading }) {
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.95, y: 20 }}
             transition={{ duration: 0.25 }}
-            className="bg-[#FDFBF7] rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden"
+            className="bg-[#FDFBF7] dark:bg-[#1e293b] rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden"
             onClick={(e) => e.stopPropagation()}
             data-testid="refine-panel"
           >
@@ -76,7 +76,7 @@ export default function RefinePanel({ open, onClose, onSubmit, loading }) {
 
             <div className="px-6 py-5 space-y-5">
               <div>
-                <p className="text-sm font-semibold text-slate-700 mb-3">
+                <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-3">
                   What would you like to change?
                 </p>
                 <div className="grid grid-cols-2 gap-2.5">
@@ -91,7 +91,7 @@ export default function RefinePanel({ open, onClose, onSubmit, loading }) {
                         className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border text-sm transition-all ${
                           isSelected
                             ? "border-[#0D5C75] bg-[#0D5C75]/8 text-[#0D5C75] font-semibold"
-                            : "border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                            : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-slate-300 hover:bg-slate-50 dark:hover:bg-[#172030]"
                         } disabled:opacity-50`}
                         data-testid={`refine-option-${r.key}`}
                       >
@@ -104,7 +104,7 @@ export default function RefinePanel({ open, onClose, onSubmit, loading }) {
               </div>
 
               <div>
-                <label className="text-sm font-semibold text-slate-700 mb-2 block">
+                <label className="text-sm font-semibold text-slate-700 dark:text-slate-200 mb-2 block">
                   Anything else?
                 </label>
                 <textarea
@@ -113,17 +113,17 @@ export default function RefinePanel({ open, onClose, onSubmit, loading }) {
                   disabled={loading}
                   placeholder="e.g. I want to visit a specific museum, or avoid early mornings…"
                   rows={3}
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-[#0D5C75] focus:ring-1 focus:ring-[#0D5C75]/20 disabled:opacity-50"
+                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#172030] text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 focus:outline-none focus:border-[#0D5C75] focus:ring-1 focus:ring-[#0D5C75]/20 disabled:opacity-50"
                   data-testid="refine-custom"
                 />
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-[#FDFBF7] border-t border-slate-100 flex justify-end gap-3">
+            <div className="px-6 py-4 bg-[#FDFBF7] dark:bg-[#1e293b] border-t border-slate-100 dark:border-slate-700 flex justify-end gap-3">
               <button
                 onClick={onClose}
                 disabled={loading}
-                className="text-sm px-4 py-2 rounded-full border border-slate-300 text-slate-600 hover:bg-white disabled:opacity-50 transition-colors"
+                className="text-sm px-4 py-2 rounded-full border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-[#172030] disabled:opacity-50 transition-colors"
               >
                 Cancel
               </button>

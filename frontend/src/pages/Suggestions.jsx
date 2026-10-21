@@ -143,7 +143,7 @@ function PreferencesRow({ prefs, onChange, disabled }) {
               className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                 prefs.budget === value
                   ? "bg-[#0D5C75] text-white border-[#0D5C75]"
-                  : "border-slate-200 text-slate-600 hover:border-[#0D5C75]/40"
+                  : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#0D5C75]/40"
               } disabled:opacity-50`}
               data-testid={`pref-budget-${value}`}
             >
@@ -169,7 +169,7 @@ function PreferencesRow({ prefs, onChange, disabled }) {
           >
             −
           </button>
-          <span className="font-semibold text-slate-700 min-w-[3rem] text-center text-sm" data-testid="pref-days">
+          <span className="font-semibold text-slate-700 dark:text-slate-200 min-w-[3rem] text-center text-sm" data-testid="pref-days">
             {prefs.duration_days || 5} days
           </span>
           <button
@@ -200,7 +200,7 @@ function PreferencesRow({ prefs, onChange, disabled }) {
               className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors ${
                 prefs.companions === value
                   ? "bg-[#0D5C75] text-white border-[#0D5C75]"
-                  : "border-slate-200 text-slate-600 hover:border-[#0D5C75]/40"
+                  : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#0D5C75]/40"
               } disabled:opacity-50`}
               data-testid={`pref-companions-${value}`}
             >

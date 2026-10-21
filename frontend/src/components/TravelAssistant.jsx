@@ -151,7 +151,7 @@ export default function TravelAssistant({ itinerary }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className="fixed bottom-24 right-6 z-50 w-[calc(100vw-3rem)] sm:w-96 max-h-[70vh] flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden"
+            className="fixed bottom-24 right-6 z-50 w-[calc(100vw-3rem)] sm:w-96 max-h-[70vh] flex flex-col bg-white dark:bg-[#1e293b] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden"
             data-testid="assistant-panel"
           >
             {/* Header */}
@@ -180,7 +180,7 @@ export default function TravelAssistant({ itinerary }) {
             {/* Messages */}
             <div
               ref={scrollRef}
-              className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50"
+              className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50 dark:bg-[#172030]"
             >
               {messages.length === 0 && (
                 <div className="text-center py-6">
@@ -199,7 +199,7 @@ export default function TravelAssistant({ itinerary }) {
                       <button
                         key={q}
                         onClick={() => send(q)}
-                        className="block w-full text-left text-sm text-slate-700 bg-white border border-slate-200 rounded-lg px-3 py-2.5 hover:border-[#0D5C75] hover:text-[#0D5C75] transition-colors"
+                        className="block w-full text-left text-sm text-slate-700 dark:text-slate-200 bg-white dark:bg-[#1e293b] border border-slate-200 dark:border-slate-700 rounded-lg px-3 py-2.5 hover:border-[#0D5C75] hover:text-[#0D5C75] dark:hover:border-[#0D5C75] dark:hover:text-[#5eead4] transition-colors"
                       >
                         {q}
                       </button>
@@ -218,8 +218,8 @@ export default function TravelAssistant({ itinerary }) {
                       msg.role === "user"
                         ? "bg-[#0D5C75] text-white rounded-br-md"
                         : msg.isError
-                        ? "bg-red-50 border border-red-200 text-red-700 rounded-bl-md"
-                        : "bg-white border border-slate-200 text-slate-700 rounded-bl-md"
+                        ? "bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 rounded-bl-md"
+                        : "bg-white dark:bg-[#233140] border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-bl-md"
                     }`}
                   >
                     <p className="leading-relaxed whitespace-pre-wrap">{msg.text}</p>
@@ -236,7 +236,7 @@ export default function TravelAssistant({ itinerary }) {
 
               {loading && (
                 <div className="flex justify-start">
-                  <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-1.5">
+                  <div className="bg-white dark:bg-[#233140] border border-slate-200 dark:border-slate-700 rounded-2xl rounded-bl-md px-4 py-3 flex items-center gap-1.5">
                     {[0, 1, 2].map((i) => (
                       <motion.span
                         key={i}
@@ -255,7 +255,7 @@ export default function TravelAssistant({ itinerary }) {
             </div>
 
             {/* Input */}
-            <div className="border-t border-slate-200 p-3 bg-white">
+            <div className="border-t border-slate-200 dark:border-slate-700 p-3 bg-white dark:bg-[#1e293b]">
               <div className="flex items-end gap-2">
                 <textarea
                   ref={inputRef}
@@ -264,7 +264,7 @@ export default function TravelAssistant({ itinerary }) {
                   onKeyDown={handleKey}
                   placeholder="Ask about your trip..."
                   rows={1}
-                  className="flex-1 resize-none border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:border-[#0D5C75] focus:ring-1 focus:ring-[#0D5C75] max-h-24"
+                  className="flex-1 resize-none border border-slate-200 dark:border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-700 dark:text-slate-200 placeholder:text-slate-400 bg-white dark:bg-[#172030] focus:outline-none focus:border-[#0D5C75] focus:ring-1 focus:ring-[#0D5C75] max-h-24"
                   data-testid="assistant-input"
                 />
                 <button

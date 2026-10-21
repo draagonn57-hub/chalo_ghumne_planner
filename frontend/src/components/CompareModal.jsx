@@ -5,6 +5,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import SmartImage from "@/components/SmartImage";
+import { useTheme } from "@/lib/ThemeContext";
 
 /* ── The exact 5 allowed criteria (order matters) ────────────────────────────── */
 const ALLOWED_CRITERIA = [
@@ -172,23 +173,24 @@ function SkeletonRows() {
 
 /* ── score chip ─────────────────────────────────────────────────────────────── */
 function ScoreChip({ score, note, isWinner, isBest }) {
+  const { isDark } = useTheme();
   return (
     <div
       className="rounded-xl px-3 py-2.5 transition-colors"
       style={
         isWinner || isBest
           ? { background: "rgba(74,103,65,0.12)", border: "1px solid rgba(74,103,65,0.25)" }
-          : { background: "rgba(255,255,255,0.4)", border: "1px solid rgba(255,255,255,0.3)" }
+          : { background: isDark ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.4)", border: isDark ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(255,255,255,0.3)" }
       }
     >
       <p
         className="text-base font-bold leading-none"
-        style={{ color: isWinner || isBest ? "#4A6741" : "#1A2530" }}
+        style={{ color: isWinner || isBest ? "#4A6741" : (isDark ? "#e2e8f0" : "#1A2530") }}
       >
         {Number.isFinite(score) ? `${score}/10` : "—"}
       </p>
       {note && (
-        <p className="text-xs text-slate-500 mt-1.5 leading-snug">{note}</p>
+        <p className="text-xs mt-1.5 leading-snug" style={{ color: isDark ? "#94a3b8" : "#64748b" }}>{note}</p>
       )}
     </div>
   );
@@ -199,6 +201,7 @@ export default function CompareModal({ open, destinations, preferences, onClose,
   const [status, setStatus] = useState("loading");
   const [result, setResult] = useState(null);
   const [error, setError]   = useState("");
+  const { isDark } = useTheme();
 
   const runCompare = useCallback(async () => {
     if (!Array.isArray(destinations) || destinations.length < 2 || destinations.length > 4) {
@@ -251,20 +254,20 @@ export default function CompareModal({ open, destinations, preferences, onClose,
           aria-labelledby="compare-modal-title"
           className="relative w-full sm:max-w-5xl rounded-none sm:rounded-3xl"
           style={{
-            background: "rgba(248, 246, 242, 0.72)",
+            background: isDark ? "rgba(26, 37, 48, 0.95)" : "rgba(248, 246, 242, 0.72)",
             backdropFilter: "blur(20px)",
             WebkitBackdropFilter: "blur(20px)",
-            border: "1px solid rgba(255,255,255,0.55)",
+            border: isDark ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(255,255,255,0.55)",
             boxShadow: "0 24px 80px rgba(0,0,0,0.28)",
           }}
           onClick={(e) => e.stopPropagation()}
         >
         {/* Header */}
         <div className="flex items-start justify-between gap-4 px-5 sm:px-8 pt-6 pb-4"
-          style={{ borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
+          style={{ borderBottom: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.06)" }}>
           <div>
             <p className="eyebrow text-[#E76F51]">Side by side</p>
-            <h2 id="compare-modal-title" className="font-display text-3xl sm:text-4xl mt-1 tracking-tight text-[#1A2530]">
+            <h2 id="compare-modal-title" className="font-display text-3xl sm:text-4xl mt-1 tracking-tight" style={{ color: isDark ? "#f1f5f9" : "#1A2530" }}>
               Compare your shortlist
             </h2>
           </div>
@@ -337,7 +340,7 @@ export default function CompareModal({ open, destinations, preferences, onClose,
               {/* ── Comparison table ── */}
               <div
                 className="rounded-2xl overflow-hidden"
-                style={{ border: "1px solid rgba(255,255,255,0.5)", background: "rgba(255,255,255,0.35)" }}
+                style={{ border: isDark ? "1px solid rgba(255,255,255,0.1)" : "1px solid rgba(255,255,255,0.5)", background: isDark ? "rgba(26,37,48,0.6)" : "rgba(255,255,255,0.35)" }}
               >
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[500px] text-sm border-separate border-spacing-0">
@@ -347,9 +350,9 @@ export default function CompareModal({ open, destinations, preferences, onClose,
                       <tr>
                         {/* Criterion label cell */}
                         <th
-                          className="text-left text-[10px] font-bold tracking-widest uppercase text-slate-400 px-4 py-4 w-36"
-                          style={{ borderBottom: "1px solid rgba(0,0,0,0.06)" }}
-                        >
+                              className="text-left text-[10px] font-bold tracking-widest uppercase px-4 py-4 w-36"
+                              style={{ borderBottom: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.06)", color: isDark ? "#64748b" : "#94a3b8" }}
+                            >
                           Criterion
                         </th>
 
@@ -360,8 +363,8 @@ export default function CompareModal({ open, destinations, preferences, onClose,
                               key={d.name}
                               className="px-3 pt-3 pb-4 text-left align-top"
                               style={{
-                                borderBottom: "1px solid rgba(0,0,0,0.06)",
-                                background: isWinner ? "rgba(74,103,65,0.1)" : "transparent",
+                                borderBottom: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.06)",
+                                background: isWinner ? (isDark ? "rgba(74,103,65,0.18)" : "rgba(74,103,65,0.1)") : "transparent",
                               }}
                             >
                               {/* Destination image */}
@@ -385,7 +388,7 @@ export default function CompareModal({ open, destinations, preferences, onClose,
                               <div>
                                 <p
                                   className="font-semibold text-sm leading-tight"
-                                  style={{ color: isWinner ? "#4A6741" : "#1A2530" }}
+                                  style={{ color: isWinner ? "#4A6741" : (isDark ? "#e2e8f0" : "#1A2530") }}
                                 >
                                   {d.name}
                                 </p>
@@ -412,9 +415,10 @@ export default function CompareModal({ open, destinations, preferences, onClose,
                           <tr key={row.name} className="align-top">
                             {/* Criterion name */}
                             <td
-                              className="px-4 py-4 font-semibold text-slate-700 text-xs"
+                              className="px-4 py-4 font-semibold text-xs"
                               style={{
                                 borderTop: ri === 0 ? "none" : "1px solid rgba(0,0,0,0.05)",
+                                color: isDark ? "#94a3b8" : "#475569",
                               }}
                             >
                               <div className="flex items-start gap-1.5">
@@ -432,8 +436,8 @@ export default function CompareModal({ open, destinations, preferences, onClose,
                                   key={d.name}
                                   className="px-3 py-3"
                                   style={{
-                                    borderTop: ri === 0 ? "none" : "1px solid rgba(0,0,0,0.05)",
-                                    background: isWinner ? "rgba(74,103,65,0.07)" : "transparent",
+                                    borderTop: ri === 0 ? "none" : (isDark ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(0,0,0,0.05)"),
+                                    background: isWinner ? (isDark ? "rgba(74,103,65,0.15)" : "rgba(74,103,65,0.07)") : "transparent",
                                   }}
                                 >
                                   <ScoreChip
@@ -468,7 +472,7 @@ export default function CompareModal({ open, destinations, preferences, onClose,
                         <div
                           key={place}
                           className="rounded-xl p-3 flex items-start gap-3"
-                          style={{ background: "rgba(255,255,255,0.5)", border: "1px solid rgba(0,0,0,0.07)" }}
+                          style={{ background: isDark ? "rgba(255,255,255,0.05)" : "rgba(255,255,255,0.5)", border: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.07)" }}
                         >
                           {/* Thumb */}
                           <div className="w-12 h-12 rounded-lg overflow-hidden shrink-0">
@@ -481,13 +485,13 @@ export default function CompareModal({ open, destinations, preferences, onClose,
                             />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm text-[#1A2530] leading-tight">{place}</p>
+                            <p className="font-semibold text-sm leading-tight" style={{ color: isDark ? "#e2e8f0" : "#1A2530" }}>{place}</p>
                             {dest?.country && (
                               <p className="text-[10px] text-slate-400 flex items-center gap-0.5 mt-0.5">
                                 <MapPin size={8} />{dest.country}
                               </p>
                             )}
-                            <p className="text-xs text-slate-500 mt-1 leading-snug">{note}</p>
+                            <p className="text-xs mt-1 leading-snug" style={{ color: isDark ? "#94a3b8" : "#64748b" }}>{note}</p>
                           </div>
                           <div className="w-2 h-2 rounded-full bg-[#E76F51]/60 shrink-0 mt-1" />
                         </div>
@@ -503,8 +507,8 @@ export default function CompareModal({ open, destinations, preferences, onClose,
 
         {/* Footer */}
         <div
-          className="px-5 sm:px-8 py-3 flex items-center gap-2 text-slate-400 text-xs"
-          style={{ borderTop: "1px solid rgba(0,0,0,0.06)" }}
+          className="px-5 sm:px-8 py-3 flex items-center gap-2 text-xs"
+          style={{ borderTop: isDark ? "1px solid rgba(255,255,255,0.08)" : "1px solid rgba(0,0,0,0.06)", color: isDark ? "#64748b" : "#94a3b8" }}
         >
           <Scale size={12} />
           Comparing {destinations.length} place{destinations.length !== 1 ? "s" : ""}
