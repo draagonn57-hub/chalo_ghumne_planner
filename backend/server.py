@@ -26,6 +26,16 @@ from auth import (
     require_admin,
 )
 
+from rate_limit import (
+    get_client_ip,
+    auth_limiter,
+    verify_limiter,
+    signup_limiter,
+    reset_limiter,
+    general_limiter,
+    ai_limiter,
+)
+
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 
@@ -101,13 +111,13 @@ class OtpSendIn(BaseModel):
 
 class OtpVerifyIn(BaseModel):
     email: EmailStr
-    code: str
+    code: str = Field(..., min_length=6, max_length=6, pattern=r"^\d{6}$")
 
 
 class SignupIn(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=100)
     email: EmailStr
-    password: Optional[str] = Field(default=None, min_length=6)
+    password: Optional[str] = Field(default=None, min_length=8, max_length=128)
 
 
 class GoogleAuthIn(BaseModel):
@@ -129,13 +139,13 @@ class ForgotIn(BaseModel):
 
 
 class ResetIn(BaseModel):
-    token: str
-    new_password: str = Field(min_length=6)
+    token: str = Field(..., min_length=1, max_length=200)
+    new_password: str = Field(..., min_length=8, max_length=128)
 
 
 class ProfileUpdate(BaseModel):
-    name: Optional[str] = None
-    avatar: Optional[str] = None
+    name: Optional[str] = Field(default=None, max_length=100)
+    avatar: Optional[str] = Field(default=None, max_length=500)
     preferences: Optional[Dict[str, Any]] = None
 
 
@@ -331,9 +341,9 @@ class BookingCreate(BaseModel):
         default_factory=dict
     )
 
-    payment_status: str = "demo_paid"
-    transaction_id: str = ""
-    booking_status: str = "confirmed"
+    # NOTE: payment_status and booking_status are intentionally NOT accepted
+    # from the client — the server sets them to "demo_paid" / "confirmed".
+    transaction_id: str = Field(default="", max_length=200)
     # Optional: itinerary snapshot stored at booking time for PDF generation
     itinerary_snapshot: Optional[Dict[str, Any]] = None
     # Optional: transport mode (flight | train)
@@ -368,7 +378,9 @@ def now_iso() -> str:
 # ============================================================
 
 @api.post("/auth/signup")
-async def signup(body: SignupIn):
+async def signup(request: Request, body: SignupIn):
+    # Rate limit: 3 signups per hour per IP
+    await signup_limiter.check(get_client_ip(request), "signup")
 
     existing = await db.users.find_one(
         {"email": body.email.lower()}
@@ -406,7 +418,9 @@ async def signup(body: SignupIn):
 
 
 @api.post("/auth/login")
-async def login(body: LoginIn):
+async def login(request: Request, body: LoginIn):
+    # Rate limit: 5 attempts per 5 minutes per IP
+    await auth_limiter.check(get_client_ip(request), "login")
 
     user = await db.users.find_one(
         {"email": body.email.lower()}
@@ -454,28 +468,11 @@ async def google_auth(body: GoogleAuthIn):
             idinfo = id_token.verify_oauth2_token(raw_token, request)
     except Exception as e:
         logger.error(f"Google ID token verification failed: {e}")
-        # Allow simulated/test tokens in test/dev environment
-        if (
-            os.environ.get("TESTING") == "1"
-            or os.environ.get("ENV") == "test"
-            or raw_token.startswith("test_")
-            or raw_token.startswith("mock_")
-        ):
-            try:
-                import jwt as pyjwt
-                idinfo = pyjwt.decode(raw_token, options={"verify_signature": False})
-            except Exception:
-                idinfo = {
-                    "sub": f"google_{raw_token}",
-                    "email": f"{raw_token}@example.com",
-                    "name": "Test User",
-                    "picture": None,
-                }
-        else:
-            raise HTTPException(
-                status_code=401,
-                detail=f"Invalid Google ID token: {str(e)}",
-            )
+        # No test-token bypass in any environment — always require real Google tokens.
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Google credentials",
+        )
 
     google_id = idinfo.get("sub")
     email = idinfo.get("email")
@@ -488,9 +485,8 @@ async def google_auth(body: GoogleAuthIn):
             detail="Incomplete Google token information (missing sub or email)",
         )
 
-    # Require email_verified from Google (skip check for test tokens)
-    is_test = os.environ.get("TESTING") == "1" or os.environ.get("ENV") == "test"
-    if not is_test and not idinfo.get("email_verified", False):
+    # Require email_verified from Google — always enforced.
+    if not idinfo.get("email_verified", False):
         raise HTTPException(
             status_code=400,
             detail="Google account email is not verified. Please verify your Google email first.",
@@ -543,15 +539,15 @@ async def google_auth(body: GoogleAuthIn):
 
 @api.post("/auth/otp/send")
 @api.post("/auth/send-otp")
-async def send_otp(body: OtpSendIn):
+async def send_otp(request: Request, body: OtpSendIn):
     """
     Generate and send a 6-digit verification code to the user's email.
-    In local development (process.env.NODE_ENV === 'development'), logs the code
-    directly to the server terminal:
-      console.log("------------------------\n[DEV AUTH OTP]: " + code + "\n------------------------")
-    Does not require an external email provider to verify logins on localhost:3000.
     Invalidates existing codes for the email. Code expires after 10 minutes.
+    Rate-limited: 5 requests per 5 minutes per IP.
     """
+    # Rate limit: 5 OTP sends per 5 minutes per IP
+    await auth_limiter.check(get_client_ip(request), "send-otp")
+
     email = body.email.lower().strip()
     code = f"{random.randint(100000, 999999):06d}"
 
@@ -599,12 +595,16 @@ async def send_otp(body: OtpSendIn):
 
 @api.post("/auth/otp/verify")
 @api.post("/auth/verify-otp")
-async def verify_otp(body: OtpVerifyIn):
+async def verify_otp(request: Request, body: OtpVerifyIn):
     """
     Verify the 6-digit OTP code.
     Invalidates the code after 10 minutes or 5 failed verification attempts.
     On success, finds or creates the user in MongoDB and issues our session JWT token.
+    Rate-limited: 10 attempts per 5 minutes per IP.
     """
+    # Rate limit: 10 verify attempts per 5 minutes per IP
+    await verify_limiter.check(get_client_ip(request), "verify-otp")
+
     email = body.email.lower().strip()
     code = body.code.strip()
 
@@ -683,22 +683,20 @@ async def verify_otp(body: OtpVerifyIn):
 
 
 @api.post("/auth/forgot-password")
-async def forgot_password(body: ForgotIn):
+async def forgot_password(request: Request, body: ForgotIn):
+    # Rate limit by email (not IP) to avoid targeted lockout of an IP
+    # that serves many users (e.g. office NAT).
+    await reset_limiter.check(body.email.lower(), "forgot-password")
 
     user = await db.users.find_one(
         {"email": body.email.lower()}
     )
 
-    # Always return generic success
-    # to avoid email enumeration
+    _generic_msg = "If an account exists, a reset link has been sent."
+
+    # Always return generic success to avoid email enumeration
     if not user:
-        return {
-            "message": (
-                "If an account exists, "
-                "a reset link has been sent."
-            ),
-            "reset_token": None,
-        }
+        return {"message": _generic_msg}
 
     token = str(uuid.uuid4())
 
@@ -716,19 +714,17 @@ async def forgot_password(body: ForgotIn):
         }
     )
 
-    # MOCKED email — development/testing
+    # In production this would send an email with the reset link.
+    # Token is logged server-side ONLY — never returned to the client.
     logger.info(
-        f"[MOCK EMAIL] Password reset for "
-        f"{user['email']}: token={token}"
+        "[MOCK EMAIL] Password reset for %s — token written to DB only",
+        user["email"],
     )
 
-    return {
-        "message": (
-            "If an account exists, "
-            "a reset link has been sent."
-        ),
-        "reset_token": token,
-    }
+    # SECURITY FIX: do NOT return the reset_token in the response body.
+    # Previously this leaked the token, allowing password reset without
+    # email access. Token is now only accessible via the email link.
+    return {"message": _generic_msg}
 
 
 @api.post("/auth/reset-password")
@@ -834,6 +830,8 @@ async def list_destinations(
     trip_type: Optional[str] = None,
     limit: int = 50,
 ):
+    # Clamp to prevent excessive data extraction
+    limit = max(1, min(limit, 100))
 
     q = {}
 
@@ -853,6 +851,8 @@ async def list_hotels(
     city: Optional[str] = None,
     limit: int = 50,
 ):
+    # Clamp to prevent excessive data extraction
+    limit = max(1, min(limit, 100))
 
     q = {}
 
@@ -2146,6 +2146,11 @@ async def create_booking(
         "user_id": user["user_id"],
         **body.model_dump(),
         "created_at": now_iso(),
+        # SECURITY: Override any client-supplied payment/booking status.
+        # These are business-critical fields that must be set by the server,
+        # never trusted from request body.
+        "payment_status": "demo_paid",
+        "booking_status": "confirmed",
         # Email tracking fields
         "email_status": "pending",
         "email_sent_at": None,
