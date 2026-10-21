@@ -608,7 +608,7 @@ function ItineraryView({
             {localIt.title}
           </h1>
 
-          <p className="text-slate-600 mt-4 leading-relaxed">
+          <p className="text-slate-600 dark:text-slate-300 mt-4 leading-relaxed">
             {localIt.summary}
           </p>
 
@@ -709,7 +709,7 @@ function ItineraryView({
       </div>
       </div>{/* end header tp-card */}
       {/* Sticky section nav */}
-      <div className="sticky top-20 z-30 mt-8 -mx-6 px-6 py-3 bg-[#FDFBF7]/90 backdrop-blur-md border-y border-slate-100">
+      <div className="sticky top-20 z-30 mt-8 -mx-6 px-6 py-3 bg-[#FDFBF7]/90 dark:bg-[#1A2530]/95 backdrop-blur-md border-y border-slate-100 dark:border-slate-800">
         <div className="flex gap-1 overflow-x-auto hide-scrollbar">
           {visibleSections.map((s) => {
             const Icon = s.icon;
@@ -720,7 +720,7 @@ function ItineraryView({
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
                   activeSection === s.id
                     ? "bg-[#0D5C75] text-white"
-                    : "text-slate-500 hover:bg-slate-100"
+                    : "text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10"
                 }`}
                 data-testid={`section-nav-${s.id}`}
               >
@@ -765,11 +765,11 @@ function ItineraryView({
                   {d.name}
                 </div>
 
-                <div className="text-slate-500 text-sm">
+                <div className="text-slate-500 dark:text-slate-400 text-sm">
                   {d.country}
                 </div>
 
-                <p className="text-sm text-slate-600 mt-3">
+                <p className="text-sm text-slate-600 dark:text-slate-300 mt-3">
                   {d.why}
                 </p>
               </div>
@@ -790,7 +790,7 @@ function ItineraryView({
           Trip map
         </h2>
 
-        <p className="text-slate-500 mt-2 text-sm max-w-2xl">
+        <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm max-w-2xl">
           All your destinations, hotels, and daily stops plotted on an
           interactive map. Filter by day to see your route, or view the
           full trip at once.
@@ -916,7 +916,7 @@ function ItineraryView({
                     </div>
                   </div>
 
-                  <div className="text-slate-500 text-sm mt-1 flex items-center gap-1">
+                  <div className="text-slate-500 dark:text-slate-400 text-sm mt-1 flex items-center gap-1">
                     <BedDouble size={14} />
                     {h.location}
                   </div>
@@ -928,7 +928,7 @@ function ItineraryView({
                   {h.amenities?.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-3">
                       {h.amenities.map((a, ai) => (
-                        <span key={ai} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
+                        <span key={ai} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
                           {a}
                         </span>
                       ))}
@@ -977,10 +977,10 @@ function ItineraryView({
         {needsDate && (
           <div className="mt-6 tp-card p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <div className="flex-1">
-              <p className="text-sm font-medium text-slate-700">
+              <p className="text-sm font-medium text-slate-700 dark:text-slate-200">
                 Travel date needed
               </p>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                 Enter a future date to load live trains and flights.
               </p>
             </div>
@@ -988,20 +988,20 @@ function ItineraryView({
               type="date"
               min={new Date().toISOString().split("T")[0]}
               onChange={(e) => e.target.value && setOverrideDate(e.target.value)}
-              className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C75]/30 focus:border-[#0D5C75]"
+              className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C75]/30 focus:border-[#0D5C75] [color-scheme:light] dark:[color-scheme:dark]"
             />
           </div>
         )}
 
         {/* Flights / Trains tab toggle */}
         {!needsDate && showTrains && (
-          <div className="mt-6 flex items-center gap-1 p-1 bg-slate-100 rounded-full w-fit">
+          <div className="mt-6 flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-full w-fit">
             <button
               onClick={() => setTransportTab("flights")}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                 transportTab === "flights"
-                  ? "bg-white text-[#0D5C75] shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-[#233140] text-[#0D5C75] shadow-sm"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
               data-testid="tab-flights"
             >
@@ -1015,8 +1015,8 @@ function ItineraryView({
               onClick={() => setTransportTab("trains")}
               className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
                 transportTab === "trains"
-                  ? "bg-white text-[#0D5C75] shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
+                  ? "bg-white dark:bg-[#233140] text-[#0D5C75] shadow-sm"
+                  : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
               }`}
               data-testid="tab-trains"
             >
@@ -1084,12 +1084,12 @@ function ItineraryView({
                             <span className="ml-1.5 text-xs font-mono text-slate-400">{f.flight_number}</span>
                           )}
                         </div>
-                        <div className="text-sm text-slate-600 mt-0.5">
+                        <div className="text-sm text-slate-600 dark:text-slate-300 mt-0.5">
                           {f.departure_time && f.arrival_time
                             ? `${f.departure_time} → ${f.arrival_time}`
                             : `${f.from} → ${f.to}`}
                         </div>
-                        <div className="text-xs text-slate-400 mt-0.5">
+                        <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">
                           {[f.duration, f.stops].filter(Boolean).join(" · ")}
                         </div>
                       </div>
@@ -1219,7 +1219,7 @@ function ItineraryView({
                           {/* Departure time + station */}
                           <div className="shrink-0 w-16">
                             <div className="font-semibold text-base leading-tight whitespace-nowrap">{tr.departure_time}</div>
-                            <div className="text-slate-500 text-xs mt-0.5 truncate" title={tr.from_station}>{tr.from_station}</div>
+                            <div className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 truncate" title={tr.from_station}>{tr.from_station}</div>
                           </div>
 
                           {/* Duration line */}
@@ -1235,7 +1235,7 @@ function ItineraryView({
                           {/* Arrival time + station */}
                           <div className="shrink-0 w-24 text-right">
                             <div className="font-semibold text-base leading-tight whitespace-nowrap">{tr.arrival_time}</div>
-                            <div className="text-slate-500 text-xs mt-0.5 truncate text-right" title={tr.to_station}>{tr.to_station}</div>
+                            <div className="text-slate-500 dark:text-slate-400 text-xs mt-0.5 truncate text-right" title={tr.to_station}>{tr.to_station}</div>
                           </div>
                         </div>
 
@@ -1272,7 +1272,7 @@ function ItineraryView({
                                   className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
                                     chosenClassIdx === ci
                                       ? "bg-[#0D5C75] text-white border-[#0D5C75]"
-                                      : "border-slate-200 text-slate-600 hover:border-[#0D5C75]/40 hover:text-[#0D5C75]"
+                                      : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:border-[#0D5C75]/40 hover:text-[#0D5C75]"
                                   }`}
                                   data-testid={`train-${i}-class-${ci}`}
                                 >
@@ -1304,7 +1304,7 @@ function ItineraryView({
                             setTransportMode("flight");
                             setSelectedFlight(0);
                           }}
-                          className="mt-auto text-sm font-medium px-4 py-2 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+                          className="mt-auto text-sm font-medium px-4 py-2 rounded-full border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
                           data-testid={`deselect-train-${i}`}
                         >
                           ✕ Deselect
@@ -1382,15 +1382,15 @@ function ItineraryView({
                     </div>
                   </div>
 
-                  <div className="text-slate-500 text-sm">
+                  <div className="text-slate-500 dark:text-slate-400 text-sm">
                     {l.location}
                   </div>
 
-                  <p className="text-sm text-slate-600 mt-2">
+                  <p className="text-sm text-slate-600 dark:text-slate-300 mt-2">
                     {l.description}
                   </p>
                   {stay?.name && (
-                    <p className="text-xs text-slate-400 mt-2">
+                    <p className="text-xs text-slate-400 dark:text-slate-500 mt-2">
                       Estimated for {inferHotelStars(stay)}-star stay · {stay.name}
                     </p>
                   )}
@@ -1410,7 +1410,7 @@ function ItineraryView({
       >
         <p className="eyebrow">Budget breakdown</p>
         <h2 className="font-display text-3xl sm:text-4xl mt-2">Trip cost calculator</h2>
-        <p className="text-slate-500 mt-2 text-sm max-w-2xl">
+        <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm max-w-2xl">
           A detailed breakdown of your estimated trip costs — flights, stays, food, activities, and more.
         </p>
         <div className="mt-8">
@@ -1467,7 +1467,7 @@ function ItineraryView({
       )}
 
       {/* Sticky mobile action bar */}
-      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-30 bg-white border-t border-slate-200 px-4 py-3 flex gap-2 justify-around shadow-lg">
+      <div className="sm:hidden fixed bottom-0 left-0 right-0 z-30 bg-white dark:bg-[#1e293b] border-t border-slate-200 dark:border-slate-700 px-4 py-3 flex gap-2 justify-around shadow-lg">
         {onBackToSuggestions && (
           <button onClick={onBackToSuggestions} className="btn-ghost text-sm flex items-center gap-1" data-testid="itinerary-back-suggestions-mobile">
             ← Back
@@ -1713,7 +1713,7 @@ useEffect(() => {
       <div className="tp-card overflow-hidden">
         <button
           onClick={onToggle}
-          className="w-full text-left p-6 flex items-center justify-between hover:bg-slate-50/50"
+          className="w-full text-left p-6 flex items-center justify-between hover:bg-slate-50/50 dark:hover:bg-white/5"
           data-testid={`day-toggle-${index}`}
         >
           <div>
@@ -1752,7 +1752,7 @@ useEffect(() => {
             transition={{ duration: 0.3, ease: "easeInOut" }}
             className="overflow-hidden"
           >
-          <div className="px-6 pb-6 grid md:grid-cols-2 gap-6 border-t border-slate-100 pt-6">
+          <div className="px-6 pb-6 grid md:grid-cols-2 gap-6 border-t border-slate-100 dark:border-slate-700 pt-6">
             {/* Weather forecast */}
             {weatherLoading && (
               <div className="md:col-span-2 flex items-center gap-2 text-sm text-slate-400">
@@ -1762,14 +1762,14 @@ useEffect(() => {
             )}
 
             {!weatherLoading && weatherLoaded && weather?.error === "OUT_OF_RANGE" && (
-              <div className="md:col-span-2 rounded-xl p-3 bg-slate-50 border border-slate-200 flex items-center gap-2 text-sm text-slate-500">
+              <div className="md:col-span-2 rounded-xl p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                 <Calendar size={14} className="shrink-0" />
                 Weather forecast is available only for dates within the next 16 days.
               </div>
             )}
 
             {!weatherLoading && weatherLoaded && weather?.error === "NO_LOCATION" && (
-              <div className="md:col-span-2 rounded-xl p-3 bg-slate-50 border border-slate-200 flex items-center gap-2 text-sm text-slate-500">
+              <div className="md:col-span-2 rounded-xl p-3 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                 <MapPin size={14} className="shrink-0" />
                 Weather forecast unavailable — destination location not found.
               </div>

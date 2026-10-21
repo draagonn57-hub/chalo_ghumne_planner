@@ -241,7 +241,7 @@ export default function Booking() {
         <h1 className="font-display text-4xl sm:text-5xl mt-2 tracking-tight">
           Book your trip to {dest.name || "your destination"}
         </h1>
-        <p className="text-slate-600 mt-3">
+        <p className="text-slate-600 dark:text-slate-300 mt-3">
           {it.days?.length || 0} days · {dest.country || ""}
         </p>
       </motion.div>
@@ -253,7 +253,7 @@ export default function Booking() {
             key={label}
             onClick={() => i < step && setStep(i)}
             className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-              i === step ? "bg-[#0D5C75] text-white" : i < step ? "bg-[#0D5C75]/10 text-[#0D5C75] cursor-pointer" : "bg-slate-100 text-slate-400"
+              i === step ? "bg-[#0D5C75] text-white" : i < step ? "bg-[#0D5C75]/10 text-[#0D5C75] cursor-pointer" : "bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500"
             }`}
             data-testid={`booking-step-${i}`}
           >
@@ -378,7 +378,7 @@ function TransportStep({
             type="date"
             min={new Date().toISOString().split("T")[0]}
             onChange={(e) => e.target.value && onSetDate(e.target.value)}
-            className="border border-slate-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C75]/30 focus:border-[#0D5C75]"
+            className="border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0D5C75]/30 focus:border-[#0D5C75] [color-scheme:light] dark:[color-scheme:dark]"
           />
         </div>
       )}
@@ -387,11 +387,11 @@ function TransportStep({
         <>
           {/* Flights / Trains tab toggle — only for domestic */}
           {isDomestic && (
-            <div className="mt-5 flex items-center gap-1 p-1 bg-slate-100 rounded-full w-fit">
+            <div className="mt-5 flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-full w-fit">
               <button
                 onClick={() => setTransportMode("flight")}
                 className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                  transportMode === "flight" ? "bg-white text-[#0D5C75] shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  transportMode === "flight" ? "bg-white dark:bg-[#233140] text-[#0D5C75] shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                 }`}
                 data-testid="booking-tab-flights"
               >
@@ -403,7 +403,7 @@ function TransportStep({
               <button
                 onClick={() => setTransportMode("train")}
                 className={`flex items-center gap-1.5 px-4 py-1.5 rounded-full text-sm font-medium transition-all ${
-                  transportMode === "train" ? "bg-white text-[#0D5C75] shadow-sm" : "text-slate-500 hover:text-slate-700"
+                  transportMode === "train" ? "bg-white dark:bg-[#233140] text-[#0D5C75] shadow-sm" : "text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                 }`}
                 data-testid="booking-tab-trains"
               >
@@ -670,7 +670,7 @@ function HotelStep({ it, selected, onSelect }) {
                 {h.amenities?.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 mt-3">
                     {h.amenities.slice(0, 4).map((a, ai) => (
-                      <span key={ai} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{a}</span>
+                      <span key={ai} className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">{a}</span>
                     ))}
                   </div>
                 )}
@@ -725,11 +725,11 @@ function RoomStep({ roomType, setRoomType, numRooms, setNumRooms, numNights, set
         <div>
           <label className="eyebrow">Number of rooms</label>
           <div className="mt-3 flex items-center gap-4">
-            <button onClick={() => setNumRooms(Math.max(1, numRooms - 1))} className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors" data-testid="rooms-dec">
+            <button onClick={() => setNumRooms(Math.max(1, numRooms - 1))} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center justify-center transition-colors" data-testid="rooms-dec">
               <Minus size={18} />
             </button>
             <span className="font-display text-2xl w-8 text-center">{numRooms}</span>
-            <button onClick={() => setNumRooms(Math.min(5, numRooms + 1))} className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors" data-testid="rooms-inc">
+            <button onClick={() => setNumRooms(Math.min(5, numRooms + 1))} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center justify-center transition-colors" data-testid="rooms-inc">
               <Plus size={18} />
             </button>
           </div>
@@ -737,11 +737,11 @@ function RoomStep({ roomType, setRoomType, numRooms, setNumRooms, numNights, set
         <div>
           <label className="eyebrow">Number of nights</label>
           <div className="mt-3 flex items-center gap-4">
-            <button onClick={() => setNumNights(Math.max(1, numNights - 1))} className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors" data-testid="nights-dec">
+            <button onClick={() => setNumNights(Math.max(1, numNights - 1))} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center justify-center transition-colors" data-testid="nights-dec">
               <Minus size={18} />
             </button>
             <span className="font-display text-2xl w-8 text-center">{numNights}</span>
-            <button onClick={() => setNumNights(Math.min(30, numNights + 1))} className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center transition-colors" data-testid="nights-inc">
+            <button onClick={() => setNumNights(Math.min(30, numNights + 1))} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center justify-center transition-colors" data-testid="nights-inc">
               <Plus size={18} />
             </button>
           </div>
@@ -813,9 +813,9 @@ function TravelersStep({ travelers, setTravelers, setNumTravelers, updatePasseng
           <div>
             <label className="eyebrow">Number of travelers</label>
             <div className="mt-3 flex items-center gap-4">
-              <button onClick={() => setNumTravelers(travelers.numTravelers - 1)} className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center" data-testid="travelers-dec"><Minus size={18} /></button>
+              <button onClick={() => setNumTravelers(travelers.numTravelers - 1)} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center justify-center" data-testid="travelers-dec"><Minus size={18} /></button>
               <span className="font-display text-2xl w-8 text-center">{travelers.numTravelers}</span>
-              <button onClick={() => setNumTravelers(travelers.numTravelers + 1)} className="w-10 h-10 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center" data-testid="travelers-inc"><Plus size={18} /></button>
+              <button onClick={() => setNumTravelers(travelers.numTravelers + 1)} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 flex items-center justify-center" data-testid="travelers-inc"><Plus size={18} /></button>
             </div>
           </div>
         </div>
@@ -835,7 +835,7 @@ function TravelersStep({ travelers, setTravelers, setNumTravelers, updatePasseng
                 <select
                   value={p.gender}
                   onChange={(e) => updatePassenger(idx, "gender", e.target.value)}
-                  className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:border-[#E76F51] focus:outline-none"
+                  className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 focus:border-[#E76F51] focus:outline-none"
                   data-testid={`passenger-gender-${idx}`}
                 >
                   <option value="">Select</option>
@@ -875,7 +875,7 @@ function Field({ label, value, onChange, type = "text", testId, error }) {
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`mt-2 w-full px-4 py-3 rounded-xl border bg-white focus:outline-none transition-colors ${error ? "border-[#E76F51]" : "border-slate-200 focus:border-[#E76F51]"}`}
+        className={`mt-2 w-full px-4 py-3 rounded-xl border bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 focus:outline-none transition-colors ${error ? "border-[#E76F51]" : "border-slate-200 dark:border-slate-700 focus:border-[#E76F51]"}`}
         data-testid={testId}
       />
       {error && <div className="text-xs text-[#E76F51] mt-1">{error}</div>}
@@ -941,7 +941,7 @@ function ReviewStep({ dest, it, selectedFlight, selectedTrain, transportMode, se
           <Row label="Subtotal" value={formatINR(pricing.subtotal)} />
           <Row label="Taxes & fees (12%)" value={formatINR(pricing.taxes)} />
           <Row label="Discount (5%)" value={`− ${formatINR(pricing.discount)}`} />
-          <div className="border-t border-slate-100 mt-3 pt-3">
+          <div className="border-t border-slate-100 dark:border-slate-700 mt-3 pt-3">
             <Row label="Grand Total" value={formatINR(pricing.grandTotal)} bold />
           </div>
         </ReviewCard>
@@ -965,8 +965,8 @@ function ReviewCard({ title, onEdit, children }) {
 function Row({ label, value, bold }) {
   return (
     <div className={`flex items-center justify-between text-sm ${bold ? "font-bold text-base" : ""}`}>
-      <span className="text-slate-500">{label}</span>
-      <span className={bold ? "text-[#0D5C75]" : "text-slate-800"}>{value}</span>
+      <span className="text-slate-500 dark:text-slate-400">{label}</span>
+      <span className={bold ? "text-[#0D5C75]" : "text-slate-800 dark:text-slate-100"}>{value}</span>
     </div>
   );
 }
@@ -983,32 +983,32 @@ function BookingSummary({ selectedFlight, selectedTrain, transportMode, selected
       <h3 className="font-display text-2xl">Booking Summary</h3>
       <div className="mt-5 space-y-3 text-sm">
         <div className="flex justify-between">
-          <span className="text-slate-500">{transportLabel}</span>
+          <span className="text-slate-500 dark:text-slate-400">{transportLabel}</span>
           <span className="font-medium">{transportPrice}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-slate-500">Hotel</span>
+          <span className="text-slate-500 dark:text-slate-400">Hotel</span>
           <span className="font-medium truncate max-w-[180px]">{selectedHotel ? selectedHotel.name : "Not selected"}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-slate-500">Room</span>
+          <span className="text-slate-500 dark:text-slate-400">Room</span>
           <span className="font-medium">{roomType?.label || "—"}</span>
         </div>
         <div className="flex justify-between">
-          <span className="text-slate-500">Rooms × Nights</span>
+          <span className="text-slate-500 dark:text-slate-400">Rooms × Nights</span>
           <span className="font-medium">{numRooms} × {numNights}</span>
         </div>
         {addons.length > 0 && (
           <div className="flex justify-between">
-            <span className="text-slate-500">Add-ons ({addons.length})</span>
+            <span className="text-slate-500 dark:text-slate-400">Add-ons ({addons.length})</span>
             <span className="font-medium">{formatINR(pricing.addonsTotal)}</span>
           </div>
         )}
-        <div className="border-t border-slate-100 pt-3 space-y-2">
-          <div className="flex justify-between"><span className="text-slate-500">Subtotal</span><span>{formatINR(pricing.subtotal)}</span></div>
-          <div className="flex justify-between"><span className="text-slate-500">Taxes</span><span>{formatINR(pricing.taxes)}</span></div>
-          <div className="flex justify-between"><span className="text-slate-500">Discount</span><span className="text-[#E76F51]">− {formatINR(pricing.discount)}</span></div>
-          <div className="flex justify-between items-center pt-2 border-t border-slate-100">
+        <div className="border-t border-slate-100 dark:border-slate-700 pt-3 space-y-2">
+          <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Subtotal</span><span>{formatINR(pricing.subtotal)}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Taxes</span><span>{formatINR(pricing.taxes)}</span></div>
+          <div className="flex justify-between"><span className="text-slate-500 dark:text-slate-400">Discount</span><span className="text-[#E76F51]">− {formatINR(pricing.discount)}</span></div>
+          <div className="flex justify-between items-center pt-2 border-t border-slate-100 dark:border-slate-700">
             <span className="font-display text-lg">Total</span>
             <span className="font-display text-2xl text-[#0D5C75]">{formatINR(pricing.grandTotal)}</span>
           </div>

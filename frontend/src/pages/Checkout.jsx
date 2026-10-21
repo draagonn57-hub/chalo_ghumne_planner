@@ -155,7 +155,7 @@ export default function Checkout() {
       {/* Demo notice */}
       <div className="mt-4 flex items-start gap-3 p-4 rounded-xl bg-[#E76F51]/8 border border-[#E76F51]/20" data-testid="demo-notice">
         <ShieldCheck size={20} className="text-[#E76F51] shrink-0 mt-0.5" />
-        <p className="text-sm text-[#1A2530]">
+        <p className="text-sm text-[#1A2530] dark:text-slate-200">
           <span className="font-semibold">Demo Payment — No real money will be charged.</span>{" "}
           This is a simulated payment gateway for demonstration purposes only.
         </p>
@@ -182,11 +182,11 @@ export default function Checkout() {
                 key={m.id}
                 whileTap={{ scale: 0.96 }}
                 onClick={() => { setMethod(m.id); setErrors({}); }}
-                className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${isSel ? "border-[#E76F51] bg-[#E76F51]/5" : "border-slate-200 hover:border-slate-300"}`}
+                className={`p-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${isSel ? "border-[#E76F51] bg-[#E76F51]/5" : "border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"}`}
                 data-testid={`pay-method-${m.id}`}
               >
-                <Icon size={22} className={isSel ? "text-[#E76F51]" : "text-slate-500"} />
-                <span className={`text-xs font-medium text-center ${isSel ? "text-[#E76F51]" : "text-slate-600"}`}>{m.label}</span>
+                <Icon size={22} className={isSel ? "text-[#E76F51]" : "text-slate-500 dark:text-slate-400"} />
+                <span className={`text-xs font-medium text-center ${isSel ? "text-[#E76F51]" : "text-slate-600 dark:text-slate-300"}`}>{m.label}</span>
               </motion.button>
             );
           })}
@@ -199,23 +199,23 @@ export default function Checkout() {
           <div className="space-y-4">
             <div>
               <label className="eyebrow">Cardholder name</label>
-              <input value={card.name} onChange={(e) => setCard({ ...card, name: e.target.value })} className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-[#E76F51] focus:outline-none" data-testid="card-name" />
+              <input value={card.name} onChange={(e) => setCard({ ...card, name: e.target.value })} className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 focus:border-[#E76F51] focus:outline-none" data-testid="card-name" />
               {errors.name && <div className="text-xs text-[#E76F51] mt-1">{errors.name}</div>}
             </div>
             <div>
               <label className="eyebrow">Card number</label>
-              <input value={card.number} onChange={(e) => setCard({ ...card, number: formatCardNumber(e.target.value) })} placeholder="0000 0000 0000 0000" className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-[#E76F51] focus:outline-none" data-testid="card-number" />
+              <input value={card.number} onChange={(e) => setCard({ ...card, number: formatCardNumber(e.target.value) })} placeholder="0000 0000 0000 0000" className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:border-[#E76F51] focus:outline-none" data-testid="card-number" />
               {errors.number && <div className="text-xs text-[#E76F51] mt-1">{errors.number}</div>}
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="eyebrow">Expiry (MM/YY)</label>
-                <input value={card.expiry} onChange={(e) => setCard({ ...card, expiry: e.target.value })} placeholder="MM/YY" className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-[#E76F51] focus:outline-none" data-testid="card-expiry" />
+                <input value={card.expiry} onChange={(e) => setCard({ ...card, expiry: e.target.value })} placeholder="MM/YY" className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:border-[#E76F51] focus:outline-none" data-testid="card-expiry" />
                 {errors.expiry && <div className="text-xs text-[#E76F51] mt-1">{errors.expiry}</div>}
               </div>
               <div>
                 <label className="eyebrow">CVV</label>
-                <input type="password" value={card.cvv} onChange={(e) => setCard({ ...card, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="•••" className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-[#E76F51] focus:outline-none" data-testid="card-cvv" />
+                <input type="password" value={card.cvv} onChange={(e) => setCard({ ...card, cvv: e.target.value.replace(/\D/g, "").slice(0, 4) })} placeholder="•••" className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:border-[#E76F51] focus:outline-none" data-testid="card-cvv" />
                 {errors.cvv && <div className="text-xs text-[#E76F51] mt-1">{errors.cvv}</div>}
               </div>
             </div>
@@ -225,7 +225,7 @@ export default function Checkout() {
         {method === "upi" && (
           <div>
             <label className="eyebrow">UPI ID</label>
-            <input value={upi} onChange={(e) => setUpi(e.target.value)} placeholder="yourname@bank" className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 focus:border-[#E76F51] focus:outline-none" data-testid="upi-id" />
+            <input value={upi} onChange={(e) => setUpi(e.target.value)} placeholder="yourname@bank" className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:border-[#E76F51] focus:outline-none" data-testid="upi-id" />
             {errors.upi && <div className="text-xs text-[#E76F51] mt-1">{errors.upi}</div>}
           </div>
         )}
@@ -233,7 +233,7 @@ export default function Checkout() {
         {method === "netbanking" && (
           <div>
             <label className="eyebrow">Select bank</label>
-            <select value={bank} onChange={(e) => setBank(e.target.value)} className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:border-[#E76F51] focus:outline-none" data-testid="netbanking-bank">
+            <select value={bank} onChange={(e) => setBank(e.target.value)} className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 focus:border-[#E76F51] focus:outline-none" data-testid="netbanking-bank">
               <option value="">Choose your bank</option>
               {BANKS.map((b) => <option key={b} value={b}>{b}</option>)}
             </select>
@@ -244,7 +244,7 @@ export default function Checkout() {
         {method === "wallet" && (
           <div>
             <label className="eyebrow">Select wallet</label>
-            <select value={wallet} onChange={(e) => setWallet(e.target.value)} className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 bg-white focus:border-[#E76F51] focus:outline-none" data-testid="wallet-select">
+            <select value={wallet} onChange={(e) => setWallet(e.target.value)} className="mt-2 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 focus:border-[#E76F51] focus:outline-none" data-testid="wallet-select">
               <option value="">Choose your wallet</option>
               {WALLETS.map((w) => <option key={w} value={w}>{w}</option>)}
             </select>
@@ -271,7 +271,7 @@ export default function Checkout() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-[#FDFBF7]/95 backdrop-blur-sm"
+            className="fixed inset-0 z-50 flex items-center justify-center bg-[#FDFBF7]/95 dark:bg-[#1A2530]/95 backdrop-blur-sm"
             data-testid="payment-processing"
           >
             <div className="w-full max-w-md px-6">
@@ -292,11 +292,11 @@ export default function Checkout() {
                         className="flex items-center gap-3 justify-center"
                       >
                         <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                          isDone ? "bg-[#0D5C75] text-white" : isActive ? "bg-[#E76F51]/10 border-2 border-[#E76F51] border-t-transparent rounded-full animate-spin" : "border-2 border-slate-200"
+                          isDone ? "bg-[#0D5C75] text-white" : isActive ? "bg-[#E76F51]/10 border-2 border-[#E76F51] border-t-transparent rounded-full animate-spin" : "border-2 border-slate-200 dark:border-slate-600"
                         }`}>
                           {isDone && <Check size={16} strokeWidth={3} />}
                         </div>
-                        <span className={`text-sm font-medium ${isDone ? "text-[#0D5C75]" : isActive ? "text-[#1A2530]" : "text-slate-400"}`}>
+                        <span className={`text-sm font-medium ${isDone ? "text-[#0D5C75]" : isActive ? "text-[#1A2530] dark:text-slate-100" : "text-slate-400 dark:text-slate-500"}`}>
                           {label}
                         </span>
                       </motion.div>
