@@ -12,7 +12,7 @@ export default function FloatingContact() {
       href={mailtoLink("Chalo Ghumne support")}
       aria-label="Contact us"
       title="Contact us"
-      className="floating-btn no-print fixed bottom-20 right-6 z-40 group flex items-center justify-center w-11 h-11 rounded-full bg-[#E76F51] text-white shadow-lg hover:bg-[#D65A3D] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D5C75] focus-visible:ring-offset-2"
+      className="floating-btn no-print fixed bottom-20 right-6 z-40 group flex items-center justify-center w-14 h-14 rounded-full bg-[#E76F51] text-white shadow-lg hover:bg-[#D65A3D] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0D5C75] focus-visible:ring-offset-2"
     >
       <MessageCircle size={20} />
       {/* Tooltip */}

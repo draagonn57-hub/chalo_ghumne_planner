@@ -106,7 +106,7 @@ export default function TravelAssistant({ itinerary }) {
       {/* Floating button */}
       <motion.button
         onClick={() => setOpen(!open)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-[#0D5C75] text-white shadow-xl flex items-center justify-center hover:bg-[#0a4a5e] transition-colors"
+        className="fixed bottom-20 left-6 z-50 w-14 h-14 rounded-full bg-[#0D5C75] text-white shadow-xl flex items-center justify-center hover:bg-[#0a4a5e] transition-colors"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         aria-label="Ask AI assistant"
@@ -137,7 +137,7 @@ export default function TravelAssistant({ itinerary }) {
         </AnimatePresence>
 
         {!open && (
-          <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#F2B48A] rounded-full flex items-center justify-center">
+          <span className="absolute -top-1 -left-1 w-4 h-4 bg-[#F2B48A] rounded-full flex items-center justify-center">
             <Sparkles size={10} className="text-[#0D5C75]" />
           </span>
         )}
@@ -151,7 +151,7 @@ export default function TravelAssistant({ itinerary }) {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.95 }}
             transition={{ duration: 0.25, ease: "easeOut" }}
-            className="fixed bottom-24 right-6 z-50 w-[calc(100vw-3rem)] sm:w-96 max-h-[70vh] flex flex-col bg-white dark:bg-[#1e293b] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden"
+            className="fixed bottom-36 left-6 z-50 w-[calc(100vw-3rem)] sm:w-96 max-h-[70vh] flex flex-col bg-white dark:bg-[#1e293b] rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 overflow-hidden"
             data-testid="assistant-panel"
           >
             {/* Header */}
