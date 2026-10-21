@@ -1,8 +1,9 @@
+
 # Secrets Scan Report
 
-**Scanned:** Working tree + full `git log -p --all` history  
-**Date:** 2026  
-**Branch:** security/infra  
+**Scanned:** Working tree + full `git log -p --all` history
+**Date:** 2026
+**Branch:** security/infra
 
 ---
 
@@ -12,20 +13,19 @@
 
 | Line | Variable | Secret Type | Value (redacted) |
 |------|----------|-------------|------------------|
-| 1 | `MONGO_URL` | MongoDB Atlas connection string (user+password embedded) | `mongodb+srv://draagonn57_db_user:Lv8g7DY6y3T%40mcj@cluster0.7i2zdaa.mongodb.net/…` |
-| 4 | `GEMINI_API_KEY` | Google Gemini API key | `AQ.Ab8RN6Lce5A1haPNN4PTezmN9xuNt0lsus9DVMBpvlapV9NZmA` |
-| 6 | `JWT_SECRET` | JWT signing secret (weak/guessable) | `hasan_super_secret_key_123` |
-| 8 | `RAPIDAPI_KEY` | RapidAPI key | `741507427dmsh21fd3750b3e1e97p187969jsn54b4ecb73fa0` |
-| 14 | `SERPAPI_KEY` | SerpAPI key | `627dc9a43607592066223fc0d90ae8277138e59512a99ef66a5a1b388038fbf9` |
-| 16 | `PARSE_API_KEY` | Parse.bot scraper API key | `parse_r6kpsafm8qn7vnqyqsr7` |
-| 20 | `SMTP_APP_PASSWORD` | Gmail App Password | `bhao hlqu aznt ubqu` |
-| 24 | `RESEND_API_KEY` | Resend transactional email key | `re_CnjCcJae_M4Hak1XyeSc4scZi9Z8CUqy5` |
-| 27 | `RAILKIT_API_KEY` | Railkit SDK API key | `railkit_c5d14b88fac3562eb01996b1b2a559580d028848c2fc4c81` |
-| 31 | `REACT_APP_UNSPLASH_KEY` | Unsplash API key (also in frontend/.env) | `aQjV_NfkVXRBF6sX8kzRbs6taHj-e_JUjNWzlOzFAVk` |
+| 1 | `MONGO_URL` | MongoDB Atlas connection string (user+password embedded) | REDACTED|
+| 4 | `GEMINI_API_KEY` | Google Gemini API key | REDACTED |
+| 6 | `JWT_SECRET` | JWT signing secret (weak/guessable) | REDACTED |
+| 8 | `RAPIDAPI_KEY` | RapidAPI key | REDACTED |
+| 14 | `SERPAPI_KEY` | SerpAPI key | REDACTED |
+| 16 | `PARSE_API_KEY` | Parse.bot scraper API key | REDACTED |
+| 20 | `SMTP_APP_PASSWORD` | Gmail App Password | REDACTED |
+| 24 | `RESEND_API_KEY` | Resend transactional email key | ` REDACTED ` |
+| 27 | `RAILKIT_API_KEY` | Railkit SDK API key | ` REDACTED ` |
+| 31 | `REACT_APP_UNSPLASH_KEY` | Unsplash API key (also in frontend/.env) | REDACTED ` |
 
 **Additional note:** Line 5 and the commented-out block contain two additional (possibly rotated) Gemini API keys:
-- `AQ.Ab8RN6Lce5A1haPNN4PTezmN9xuNt0lsus9DVMBpvlapV9NZmA` (active)
-- `AQ.Ab8RN6Jaaig0x-yqwmaK4q5EnuHMzcXF7v7WbI1uTMI-jXnWUA` (commented-out, treat as potentially leaked)
+- REDACTED ` (active) REDACTED `AQ.Ab8RN6Jaaig0x-yqwmaK4q5EnuHMzcXF7v7WbI1uTMI-jXnWUA` (commented-out, treat as potentially leaked)
 
 ---
 
@@ -33,9 +33,9 @@
 
 | Line | Variable | Secret Type | Value (redacted) |
 |------|----------|-------------|------------------|
-| 2 | `REACT_APP_UNSPLASH_KEY` | Unsplash API key — **exposed to client bundle via `REACT_APP_` prefix** | `aQjV_NfkVXRBF6sX8kzRbs6taHj-e_JUjNWzlOzFAVk` |
-| 3 | `REACT_APP_GOOGLE_MAPS_API_KEY` | Google Maps API key — **exposed to client bundle via `REACT_APP_` prefix** | `AIzaSyD-fs5m2IqXVNeqIliMzZDQlb5TaaBVt6w` |
-| 4 | `REACT_APP_GOOGLE_CLIENT_ID` | Google OAuth Client ID — **exposed to client bundle via `REACT_APP_` prefix** | `84500475860-kt6nbrh7k16b804utd9f39c2m44kg95q.apps.googleusercontent.com` |
+| 2 | `REACT_APP_UNSPLASH_KEY` | Unsplash API key — **exposed to client bundle via `REACT_APP_` prefix** |  REDACTED |
+| 3 | `REACT_APP_GOOGLE_MAPS_API_KEY` | Google Maps API key — **exposed to client bundle via `REACT_APP_` prefix** | REDACTED |
+| 4 | `REACT_APP_GOOGLE_CLIENT_ID` | Google OAuth Client ID — **exposed to client bundle via `REACT_APP_` prefix** | REDACTED |
 
 **Important clarification on `REACT_APP_` keys:**
 - `REACT_APP_GOOGLE_CLIENT_ID` — Google OAuth Client IDs are designed to be public; browser-side OAuth requires it. However it must be registered properly with authorised origins in GCP Console to prevent abuse.
@@ -48,7 +48,7 @@
 
 | Line | Finding | Severity |
 |------|---------|----------|
-| 6 | `ADMIN_PASSWORD = "Admin@12345"` hardcoded default admin password | LOW (seed script only, but must be changed on any real deployment) |
+| 6 | `ADMIN_PASSWORD = " REDACTED "` hardcoded default admin password | LOW (seed script only, but must be changed on any real deployment) |
 
 ---
 
@@ -56,7 +56,7 @@
 
 | Line | Finding |
 |------|---------|
-| 11–13 | Google Client ID hardcoded as fallback: `"84500475860-kt6nbrh7k16b804utd9f39c2m44kg95q.apps.googleusercontent.com"` — also appears as `data-client_id` attributes on DOM elements (lines ~74, ~87). Client IDs are public by nature for Google OAuth, but they must be restricted in GCP Console. |
+| 11–13 | Google Client ID hardcoded as fallback: `" REDACTED "` — also appears as `data-client_id` attributes on DOM elements (lines ~74, ~87). Client IDs are public by nature for Google OAuth, but they must be restricted in GCP Console. |
 | ~87 | `data-client_id=` hardcoded in JSX markup (same value) |
 
 ---
@@ -75,8 +75,8 @@
 
 | Commit | File | Finding |
 |--------|------|---------|
-| `d96c8f6` ("continue with google part-2") | `frontend/src/pages/Auth.jsx` | Google Client ID `84500475860-kt6nbrh7k16b804utd9f39c2m44kg95q.apps.googleusercontent.com` hardcoded in source — this is preserved in git history across branches including `main`. |
-| `660554e` ("login page ui") | `frontend/src/pages/Auth.jsx` | Same Google Client ID present as `data-client_id` attributes in committed JSX. |
+| `d96c8f6` ("continue with google part-2") | `frontend/src/pages/Auth.jsx` | Google Client ID ` REDACTED ` hardcoded in source — this is preserved in git history across branches including `main`. |
+| ` REDACTED ` ("login page ui") | `frontend/src/pages/Auth.jsx` | Same Google Client ID present as `data-client_id` attributes in committed JSX. |
 
 **Note on `.env` files in history:** The `backend/.env` and `frontend/.env` files are correctly listed in `.gitignore` and are **NOT** present in the git object store at any commit. The secret values in section 1 exist only on disk, not in history. The only secret-like value found in git history is the Google Client ID, which was committed directly into source code (not `.env`).
 
@@ -303,6 +303,7 @@ The following changes were made during Task 2 (move hardcoded secrets to env var
 
 ### 7.4 `frontend/.env.example` (created)
 - Contains placeholder dummy values for all `REACT_APP_` frontend vars.
+- Contains placeholder dummy values for all `REACT_APP_` frontend vars.
 
 ### 7.5 `frontend/.env` — `REACT_APP_` key audit
 
@@ -311,8 +312,8 @@ All four variables in `frontend/.env` use the `REACT_APP_` prefix and will be em
 | Variable | Embedded in bundle | Safe to expose? | Action required |
 |---|---|---|---|
 | `REACT_APP_BACKEND_URL` | Yes | ✅ Yes — it's a URL, not a secret | None |
-| `REACT_APP_UNSPLASH_KEY` | Yes | ⚠️ By Unsplash design, Access Keys are intended for client-side use. However, the same key is also on the backend (`backend/.env` as `REACT_APP_UNSPLASH_KEY`). The backend `image_service.py` reads it as `UNSPLASH_ACCESS_KEY` — so the backend `.env` entry with the `REACT_APP_` prefix is effectively unused by Python. Rename it in `backend/.env` to `UNSPLASH_ACCESS_KEY` to match what `image_service.py` actually reads. | Rename in `backend/.env` + rotate per section 4.10 |
-| `REACT_APP_GOOGLE_MAPS_API_KEY` | Yes | ⚠️ HIGH — must be referrer-restricted in GCP | Restrict in GCP Console per section 4.11 |
+| `REACT_APP_UNSPLASH_KEY` | Yes | ⚠ By Unsplash design, Access Keys are intended for client-side use. However, the same key is also on the backend (`backend/.env` as `REACT_APP_UNSPLASH_KEY`). The backend `image_service.py` reads it as `UNSPLASH_ACCESS_KEY` — so the backend `.env` entry with the `REACT_APP_` prefix is effectively unused by Python. Rename it in `backend/.env` to `UNSPLASH_ACCESS_KEY` to match what `image_service.py` actually reads. | Rename in `backend/.env` + rotate per section 4.10 |
+| `REACT_APP_GOOGLE_MAPS_API_KEY` | Yes | ⚠ HIGH — must be referrer-restricted in GCP | Restrict in GCP Console per section 4.11 |
 | `REACT_APP_GOOGLE_CLIENT_ID` | Yes | ✅ Public by OAuth design | Restrict authorised origins in GCP per section 4.12 |
 
 **No actual backend secrets (DB passwords, JWT secret, SMTP password, etc.) are `REACT_APP_` prefixed.** The frontend `.env` does not expose backend credentials.
@@ -324,3 +325,28 @@ All four variables in `frontend/.env` use the `REACT_APP_` prefix and will be em
 ---
 
 *This report was generated by an automated scan. No code was modified in the original scan. Section 7 additions reflect Task 2 changes.*
+(END)
+
+### 7.5 `frontend/.env` — `REACT_APP_` key audit
+
+All four variables in `frontend/.env` use the `REACT_APP_` prefix and will be embedded in the client bundle. Assessment:
+
+| Variable | Embedded in bundle | Safe to expose? | Action required |
+|---|---|---|---|
+| `REACT_APP_BACKEND_URL` | Yes | ✅ Yes — it's a URL, not a secret | None |
+| `REACT_APP_UNSPLASH_KEY` | Yes | ⚠ By Unsplash design, Access Keys are intended for client-side use. However, the same key is also on the backend (`backend/.env` as `REACT_APP_UNSPLASH_KEY`). The backend `image_service.py` reads it as `UNSPLASH_ACCESS_KEY` — so the backend `.env` entry with the `REACT_APP_` prefix is effectively unused by Python. Rename it in `backend/.env` to `UNSPLASH_ACCESS_KEY` to match what `image_service.py` actually reads. | Rename in `backend/.env` + rotate per section 4.10 |
+| `REACT_APP_GOOGLE_MAPS_API_KEY` | Yes | ⚠ HIGH — must be referrer-restricted in GCP | Restrict in GCP Console per section 4.11 |
+| `REACT_APP_GOOGLE_CLIENT_ID` | Yes | ✅ Public by OAuth design | Restrict authorised origins in GCP per section 4.12 |
+
+**No actual backend secrets (DB passwords, JWT secret, SMTP password, etc.) are `REACT_APP_` prefixed.** The frontend `.env` does not expose backend credentials.
+
+### 7.6 `.gitignore` — verified
+- The existing `.env` and `.env.*` patterns already cover `backend/.env` and `frontend/.env` across all subdirectories (confirmed with `git check-ignore`). No changes needed.
+- `!.env.example` negation correctly allows `.env.example` files to be tracked.
+
+---
+
+*This report was generated by an automated scan. No code was modified in the original scan. Section 7 additions reflect Task 2 changes.*
+
+
+
