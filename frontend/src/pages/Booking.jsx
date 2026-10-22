@@ -848,6 +848,27 @@ function TravelersStep({ travelers, setTravelers, setNumTravelers, updatePasseng
           </div>
         ))}
       </div>
+
+      {/* Consent notice — DPDP Act 2023 § 6: data subjects must consent to PII processing */}
+      <div className="mt-6 flex items-start gap-2.5 p-4 rounded-xl bg-slate-50 border border-slate-200">
+        <input
+          type="checkbox"
+          id="booking-privacy-consent"
+          className="mt-0.5 w-4 h-4 rounded border-slate-300 accent-[#0D5C75] cursor-pointer shrink-0"
+          data-testid="booking-privacy-consent"
+          aria-required="true"
+          onChange={() => {}}
+          defaultChecked={false}
+        />
+        <label htmlFor="booking-privacy-consent" className="text-xs text-slate-500 leading-relaxed cursor-pointer">
+          I confirm that all passengers have consented to their personal data (name, date of birth,
+          gender) being used for this booking, and I accept the{" "}
+          <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-[#0D5C75] underline font-medium">Privacy Policy</a>
+          {" "}and{" "}
+          <a href="/cancellation-policy" target="_blank" rel="noopener noreferrer" className="text-[#0D5C75] underline font-medium">Cancellation Policy</a>.
+          <span className="text-[#E76F51] ml-1" aria-hidden="true">*</span>
+        </label>
+      </div>
     </div>
   );
 }

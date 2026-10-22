@@ -20,6 +20,7 @@ import DynamicBackground from "@/components/DynamicBackground";
 import BackToTop from "@/components/BackToTop";
 import ScrollProgressBar from "@/components/ScrollProgressBar";
 import FloatingContact from "@/components/FloatingContact";
+import CookieConsent from "@/components/CookieConsent";
 
 import Landing from "@/pages/Landing";
 import { Login, Signup, ForgotPassword, ResetPassword } from "@/pages/Auth";
@@ -32,6 +33,10 @@ import Dashboard from "@/pages/Dashboard";
 import Profile from "@/pages/Profile";
 import Destinations from "@/pages/Destinations";
 import Admin from "@/pages/Admin";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import TermsAndConditions from "@/pages/TermsAndConditions";
+import CookiePolicy from "@/pages/CookiePolicy";
+import CancellationPolicy from "@/pages/CancellationPolicy";
 
 // Booking system
 import Booking from "@/pages/Booking";
@@ -111,6 +116,8 @@ function Shell() {
         <a href="#main-content" className="skip-link">Skip to content</a>
 
         {!isAuthPage && <Navbar />}
+        {/* Cookie consent banner — shown until user makes a choice */}
+        <CookieConsent />
 
         {/*
           - Landing: its own background inside the hero, solid white sections below — no global bg
@@ -151,6 +158,13 @@ function Shell() {
             path="/reset"
             element={<ResetPassword />}
           />
+
+          {/* ==================== LEGAL ==================== */}
+
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsAndConditions />} />
+          <Route path="/cookie-policy" element={<CookiePolicy />} />
+          <Route path="/cancellation-policy" element={<CancellationPolicy />} />
 
           {/* ==================== TRIP PLANNING ==================== */}
 

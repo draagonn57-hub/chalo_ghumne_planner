@@ -131,6 +131,8 @@ export function EmailOtpFlow({ mode = "login", onSuccess }) {
   const [googleBusy, setGoogleBusy] = useState(false);
   const [resending, setResending] = useState(false);
   const [countdown, setCountdown] = useState(45);
+  // Privacy consent — unchecked by default (DPDP Act 2023 § 6: consent must be free, specific, informed)
+  const [consentChecked, setConsentChecked] = useState(false);
 
   // 45-second countdown timer for Step 2
   useEffect(() => {
@@ -284,7 +286,7 @@ export function EmailOtpFlow({ mode = "login", onSuccess }) {
             <button
               type="submit"
               className="w-full h-[46px] sm:h-[48px] rounded-full bg-[#0D5C75] hover:bg-[#0A485C] active:scale-[0.99] text-white font-medium text-[14px] sm:text-[15px] flex items-center justify-center gap-2 transition-all duration-200 cursor-pointer shadow-sm disabled:opacity-55 disabled:cursor-not-allowed disabled:hover:bg-[#0D5C75]"
-              disabled={busy || googleBusy || !email.trim()}
+              disabled={busy || googleBusy || !email.trim() || !consentChecked}
               data-testid="login-submit"
             >
               <span>{busy ? "Sending code…" : "Continue with email"}</span>
@@ -304,6 +306,26 @@ export function EmailOtpFlow({ mode = "login", onSuccess }) {
                 </svg>
               )}
             </button>
+
+            {/* Privacy & Terms consent — required before sending OTP (DPDP Act 2023 § 6) */}
+            <div className="flex items-start gap-2.5">
+              <input
+                type="checkbox"
+                id="auth-privacy-consent"
+                checked={consentChecked}
+                onChange={(e) => setConsentChecked(e.target.checked)}
+                className="mt-0.5 w-4 h-4 rounded border-slate-300 accent-[#0D5C75] cursor-pointer shrink-0"
+                data-testid="auth-privacy-consent"
+                aria-required="true"
+              />
+              <label htmlFor="auth-privacy-consent" className="text-xs text-slate-500 leading-relaxed cursor-pointer">
+                I have read and agree to the{" "}
+                <a href="/privacy" className="text-[#0D5C75] underline font-medium" target="_blank" rel="noopener noreferrer">Privacy Policy</a>
+                {" "}and{" "}
+                <a href="/terms" className="text-[#0D5C75] underline font-medium" target="_blank" rel="noopener noreferrer">Terms &amp; Conditions</a>.
+                <span className="text-[#E76F51] ml-1" aria-hidden="true">*</span>
+              </label>
+            </div>
           </form>
         </>
       ) : (
