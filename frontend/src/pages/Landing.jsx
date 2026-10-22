@@ -3,8 +3,10 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
 import { useLang } from "@/lib/LangContext";
 import { useAuth } from "@/lib/AuthContext";
-import { Sparkles, MapPinned, Wand2, ArrowRight, Compass } from "lucide-react";
-import DynamicBackground from "@/components/DynamicBackground";
+import { Wand2, Sparkles, MapPinned, ArrowRight } from "lucide-react";
+import MountainHero from "@/components/MountainHero";
+import TravelScrollDecorations from "@/components/TravelScrollDecorations";
+import ShibuyaEpilogue from "@/components/ShibuyaEpilogue";
 
 export default function Landing() {
   const { t } = useLang();
@@ -20,47 +22,23 @@ export default function Landing() {
     if (!user) nav("/login?next=/plan");
     else nav("/plan");
   };
-  // unchanged — /plan now shows mode selection
 
   return (
-    <div data-testid="landing-page">
-      {/* HERO */}
-      <section className="relative overflow-hidden grain">
-  <DynamicBackground mode="cycle" />
+    <div data-testid="landing-page" className="relative">
+      {/* 2D SCROLL TRAVEL ANIMATIONS (AIRPLANE & CAR) */}
+      <TravelScrollDecorations />
 
-  <div className="relative max-w-7xl mx-auto px-6 sm:px-10 pt-28 pb-32 sm:pt-40 sm:pb-44 text-white">
-          <div className="max-w-3xl animate-fade-up">
-            <p className="eyebrow text-white/80" data-testid="hero-eyebrow">AI-crafted travel · Since 2026</p>
-            <h1 className="font-display mt-4 text-5xl sm:text-7xl leading-[1.02] tracking-tight" data-testid="hero-title">
-              Journeys designed by <em className="not-italic text-[#E76F51]/80">intelligence,</em> told with soul.
-            </h1>
-            <p className="mt-6 text-lg sm:text-xl text-white/85 max-w-2xl">{t("hero_sub")}</p>
-            <div className="mt-10 flex flex-wrap gap-4">
-              <button onClick={startPlanning} className="btn-primary flex items-center gap-2 text-base" data-testid="hero-plan-btn">
-                <Sparkles size={18} /> {t("plan_my_trip")}
-              </button>
-              {/* Issue 4 fix: stronger semi-transparent fill + thicker border for visibility */}
-              {/* Issue 5 fix: added Compass icon to match other CTAs */}
-              <Link
-                to="/destinations"
-                className="btn-secondary bg-white/20 border-2 border-white/70 text-white hover:bg-white/30 flex items-center gap-2"
-                data-testid="hero-explore-btn"
-              >
-                <Compass size={16} />
-                Explore destinations
-              </Link>
-            </div>
+      {/* ============================================================ */}
+      {/* ENVIRONMENT 1: CINEMATIC OPENING MOUNTAIN HERO */}
+      {/* ============================================================ */}
+      <MountainHero t={t} startPlanning={startPlanning} />
 
-            {/* Issue 6 fix: increased top margin from mt-14 → mt-20 for breathing room */}
-            <div className="mt-20 flex items-center gap-6 text-sm text-white/80">
-              <div className="flex items-center gap-2"><MapPinned size={16} /> 180+ destinations supported</div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* ============================================================ */}
+      {/* ENVIRONMENT 2: EXISTING HOMEPAGE & DESTINATIONS (MIDDLE) */}
+      {/* ============================================================ */}
 
       {/* HOW IT WORKS */}
-      <section className="max-w-7xl mx-auto px-6 sm:px-10 py-24" data-testid="how-section">
+      <section id="how-it-works-section" className="max-w-7xl mx-auto px-6 sm:px-10 py-24 relative" data-testid="how-section">
         <div className="max-w-2xl">
           <p className="eyebrow">{t("how_it_works")}</p>
           <h2 className="font-display text-4xl sm:text-5xl mt-3 tracking-tight">Three steps. One unforgettable trip.</h2>
@@ -86,10 +64,18 @@ export default function Landing() {
       </section>
 
       {/* DESTINATIONS */}
-      <section className="max-w-7xl mx-auto px-6 sm:px-10 py-16">
+      <section className="max-w-7xl mx-auto px-6 sm:px-10 py-16 relative">
         <div className="flex items-end justify-between mb-10">
           <div>
-            <p className="eyebrow">{t("popular")}</p>
+            <div className="flex items-center gap-2">
+              <p className="eyebrow">{t("popular")}</p>
+              {/* Optional small 2D sailboat decorative icon */}
+              <svg className="w-5 h-5 text-[#0D5C75]/70" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                <path d="M2 20a2.4 2.4 0 0 0 2 1 2.4 2.4 0 0 0 2-1 2.4 2.4 0 0 1 2-1 2.4 2.4 0 0 1 2 1 2.4 2.4 0 0 0 2 1 2.4 2.4 0 0 0 2-1 2.4 2.4 0 0 1 2-1 2.4 2.4 0 0 1 2 1 2.4 2.4 0 0 0 2 1 2.4 2.4 0 0 0 2-1" />
+                <path d="M4 18L11 4v14" />
+                <path d="M13 18l7-8v8" />
+              </svg>
+            </div>
             <h2 className="font-display text-4xl sm:text-5xl mt-3 tracking-tight">Where the curious go</h2>
           </div>
           <Link to="/destinations" className="hidden sm:flex items-center gap-1 text-[#0D5C75] font-semibold hover:gap-2 transition-[gap]" data-testid="view-all-link">
@@ -115,17 +101,10 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* CTA */}
-      <section className="max-w-7xl mx-auto px-6 sm:px-10 py-24">
-        <div className="relative rounded-3xl overflow-hidden bg-[#0D5C75] text-white p-10 sm:p-16">
-          <div className="max-w-2xl relative z-10">
-            <h2 className="font-display text-4xl sm:text-5xl">Your next chapter is a click away.</h2>
-            <p className="mt-4 text-slate-200 text-lg">Start with a five-minute questionnaire and receive a full itinerary in seconds.</p>
-            <button onClick={startPlanning} className="btn-primary mt-8" data-testid="cta-plan-btn">{t("plan_my_trip")}</button>
-          </div>
-          <div className="absolute -right-16 -bottom-24 w-[420px] h-[420px] rounded-full bg-[#E76F51] opacity-30 blur-3xl" />
-        </div>
-      </section>
+      {/* ============================================================ */}
+      {/* ENVIRONMENT 3: CINEMATIC TOKYO SHIBUYA CROSSING (EPILOGUE)  */}
+      {/* ============================================================ */}
+      <ShibuyaEpilogue t={t} startPlanning={startPlanning} />
     </div>
   );
 }
