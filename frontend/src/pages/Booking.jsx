@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+﻿import { useState, useMemo, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { api } from "@/lib/api";
@@ -829,7 +829,7 @@ function TravelersStep({ travelers, setTravelers, setNumTravelers, updatePasseng
             <div className="eyebrow mb-4">Passenger {idx + 1}</div>
             <div className="grid sm:grid-cols-3 gap-4">
               <Field label="Full name" value={p.name} onChange={(v) => updatePassenger(idx, "name", v)} testId={`passenger-name-${idx}`} error={errors.passengers?.[idx]?.name} />
-              <Field label="Date of birth" type="date" value={p.dob} onChange={(v) => updatePassenger(idx, "dob", v)} testId={`passenger-dob-${idx}`} error={errors.passengers?.[idx]?.dob} />
+              <Field label="Date of birth" type="date" value={p.dob} onChange={(v) => updatePassenger(idx, "dob", v)} testId={`passenger-dob-${idx}`} error={errors.passengers?.[idx]?.dob} max={new Date().toISOString().split("T")[0]} />
               <div>
                 <label className="eyebrow">Gender</label>
                 <select
@@ -867,7 +867,7 @@ function validateTravelers(t) {
   return { ...errors, passengers: passengerErrors };
 }
 
-function Field({ label, value, onChange, type = "text", testId, error }) {
+function Field({ label, value, onChange, type = "text", testId, error, max }) {
   return (
     <div>
       <label className="eyebrow">{label}</label>
@@ -877,6 +877,7 @@ function Field({ label, value, onChange, type = "text", testId, error }) {
         onChange={(e) => onChange(e.target.value)}
         className={`mt-2 w-full px-4 py-3 rounded-xl border bg-white dark:bg-[#1e293b] text-slate-800 dark:text-slate-100 focus:outline-none transition-colors ${error ? "border-[#E76F51]" : "border-slate-200 dark:border-slate-700 focus:border-[#E76F51]"}`}
         data-testid={testId}
+        {...(max !== undefined ? { max } : {})}
       />
       {error && <div className="text-xs text-[#E76F51] mt-1">{error}</div>}
     </div>

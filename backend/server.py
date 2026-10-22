@@ -1,4 +1,4 @@
-"""AI Tour Planner — FastAPI backend."""
+﻿"""AI Tour Planner — FastAPI backend."""
 
 import os
 import sys
@@ -313,45 +313,31 @@ class HotelIn(BaseModel):
 class BookingCreate(BaseModel):
     itinerary_id: Optional[str] = None
 
-    destination: Dict[str, Any] = Field(
-        default_factory=dict
-    )
+    # Accept None from the client (e.g. flight=null when train mode is used)
+    destination: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
-    travel_dates: Dict[str, Any] = Field(
-        default_factory=dict
-    )
+    travel_dates: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
     duration_days: int = 0
 
     origin: Optional[str] = ""
 
-    flight: Dict[str, Any] = Field(
-        default_factory=dict
-    )
+    # flight is null when transport_mode == "train"
+    flight: Optional[Dict[str, Any]] = Field(default=None)
 
-    hotel: Dict[str, Any] = Field(
-        default_factory=dict
-    )
+    hotel: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
-    room: Dict[str, Any] = Field(
-        default_factory=dict
-    )
+    room: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
     num_rooms: int = 1
 
     num_nights: int = 1
 
-    addons: List[Dict[str, Any]] = Field(
-        default_factory=list
-    )
+    addons: List[Dict[str, Any]] = Field(default_factory=list)
 
-    travelers: Dict[str, Any] = Field(
-        default_factory=dict
-    )
+    travelers: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
-    pricing: Dict[str, Any] = Field(
-        default_factory=dict
-    )
+    pricing: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
     payment_status: str = "demo_paid"
     transaction_id: str = ""
